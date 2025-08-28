@@ -4,10 +4,10 @@ from pymongo import MongoClient
 client = MongoClient("mongodb://localhost:27017/")
 
 # Select database
-db = client["transaction_project"]
+db = client["Transaction_project"]
 
 # Select collection
-collection = db["users"]
+collection = db["logs"]
 
 # Read all documents
 documents = collection.find()

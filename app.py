@@ -88,12 +88,13 @@ def api_submit():
     # Ensure index for fast lookup
     collection.create_index("RFID")
     result = collection.find_one({"RFID": rfid})
-    merged_dict={**data, **result}
-    now_time_date = datetime.now()
-    merged_dict["date"] = now_time_date.strftime("%Y-%m-%d")   # e.g. "2025-08-28"
-    merged_dict["time"] = now_time_date.strftime("%H:%M:%S")   # e.g. "10:45:33"
-    print(merged_dict)
-    create_log(merged_dict)
+    if result:
+        merged_dict={**data, **result}
+        now_time_date = datetime.now()
+        merged_dict["date"] = now_time_date.strftime("%Y-%m-%d")   # e.g. "2025-08-28"
+        merged_dict["time"] = now_time_date.strftime("%H:%M:%S")   # e.g. "10:45:33"
+        print(merged_dict)
+        create_log(merged_dict)
 
     if not result:
         return jsonify({
