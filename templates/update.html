@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Update Data</title>
+</head>
+<body>
+    <h2>Update Data</h2>
+    <form action="/update/{{ doc['_id'] }}" method="post">
+        Name: <input type="text" name="Name" value="{{ doc['Name'] }}"><br><br>
+        RFID: <input type="text" name="RFID" value="{{ doc['RFID'] }}"><br><br>
+        Employee ID: <input type="Employee ID" name="role" value="{{ doc['Employee ID'] }}"><br><br>
+        <input type="submit" value="Update">
+    </form>
+    <br>
+    <a href="/list">Back to List</a>
+</body>
+</html>

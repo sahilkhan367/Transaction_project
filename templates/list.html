@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>All Data</title>
+</head>
+<body>
+    <h2>Stored Data</h2>
+    <table border="1" cellpadding="5">
+        <tr>
+            <th>Name</th>
+            <th>RFID</th>
+            <th>Employee ID</th>
+            <th>Actions</th>
+        </tr>
+        {% for doc in data %}
+        <tr>
+            <td>{{ doc['Name'] }}</td>
+            <td>{{ doc['RFID'] }}</td>
+            <td>{{ doc['Employee ID'] }}</td>
+            <td>
+                <a href="/update/{{ doc['_id'] }}">Update</a> |
+                <a href="/delete/{{ doc['_id'] }}">Delete</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+    <br>
+    <a href="/">Insert New Data</a>
+</body>
+</html>
