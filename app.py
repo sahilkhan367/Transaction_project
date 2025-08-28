@@ -1,7 +1,9 @@
 from flask import Flask, request, render_template, redirect, url_for, jsonify
 from pymongo import MongoClient
 from bson.objectid import ObjectId
-from datetime import datetime
+from datetime import datetime, timedelta
+from collections import defaultdict
+import pymongo 
 
 app = Flask(__name__)
 
@@ -10,10 +12,90 @@ client = MongoClient("mongodb://localhost:27017/")
 db = client["Transaction_project"]
 collection = db["users"]
 
+
+
+def process_all_logs(logs):
+    grouped_logs = defaultdict(list)
+    for log in logs:
+        grouped_logs[(log["Name"], log["RFID"], log["date"])].append(log)
+    
+    summaries = []  # <-- make this a list, not a dict
+    
+    for (name, rfid, date), person_logs in grouped_logs.items():
+        logs_sorted = sorted(person_logs, key=lambda x: x["time"])
+        
+        for log in logs_sorted:
+            log["datetime"] = datetime.strptime(f'{log["date"]} {log["time"]}', "%Y-%m-%d %H:%M:%S")
+        
+        login_time, logout_time = None, None
+        total_login, errors, last_action, in_time = 0, [], None, None
+        
+        for log in logs_sorted:
+            action = log["IN/OUT"]
+            
+            if action == "IN":
+                if last_action == "IN":
+                    errors.append(f"Transaction Error at {log['time']}: consecutive IN")
+                else:
+                    if login_time is None:
+                        login_time = log["datetime"]
+                    in_time = log["datetime"]
+            
+            elif action == "OUT":
+                if last_action == "OUT":
+                    errors.append(f"Transaction Error at {log['time']}: consecutive OUT")
+                else:
+                    if in_time:
+                        total_login += (log["datetime"] - in_time).total_seconds()
+                    logout_time = log["datetime"]
+                    in_time = None
+            
+            last_action = action
+        
+        total_break = 0
+        if login_time and logout_time:
+            total_duration = (logout_time - login_time).total_seconds()
+            total_break = total_duration - total_login
+            time_spent = str(logout_time - login_time)
+        else:
+            time_spent = None
+        
+        summaries.append({
+            "name": name,
+            "rfid": rfid,
+            "date": date,
+            "login_time": login_time.strftime("%H:%M:%S") if login_time else None,
+            "logout_time": logout_time.strftime("%H:%M:%S") if logout_time else None,
+            "Effective_login": str(timedelta(seconds=total_login)),
+            "Break_hours": str(timedelta(seconds=total_break)),
+            "Total_login": time_spent,
+            "errors": errors
+        })
+    
+    return summaries
+
+
+@app.route("/logs")
+def view_logs():
+    # --- Example: Fetch from MongoDB ---
+    client = pymongo.MongoClient("mongodb://localhost:27017/")  # update if needed
+    db = client["Transaction_project"]
+    collection = db["logs"]
+    logs = list(collection.find({}, {"_id": 0}))  # remove _id for clean JSON
+    
+    summary = process_all_logs(logs)
+    
+    # jsonify makes it a proper JSON response
+    return jsonify(summary)
+
+
+
 # ---- CREATE ----
 @app.route('/')
 def form():
     return render_template("form.html")
+
+
 
 @app.route('/submit', methods=['POST'])
 def submit():

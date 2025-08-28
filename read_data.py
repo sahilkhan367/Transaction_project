@@ -74,24 +74,21 @@ def process_all_logs(logs):
         if login_time and logout_time:
             total_duration = (logout_time - login_time).total_seconds()
             total_break = total_duration - total_login
-        
+        if login_time and logout_time:
+            time_spent = str(logout_time - login_time)  # gives HH:MM:SS
+        else:
+            time_spent = None
         # Save summary
         summaries[(name, rfid, date)] = {
             "login_time": login_time.strftime("%H:%M:%S") if login_time else None,
             "logout_time": logout_time.strftime("%H:%M:%S") if logout_time else None,
-            "total_login_hours": str(timedelta(seconds=total_login)),
-            "total_break_hours": str(timedelta(seconds=total_break)),
+            "Effective_login": str(timedelta(seconds=total_login)),
+            "Break_hours": str(timedelta(seconds=total_break)),
+            "Total_login": time_spent,
             "errors": errors
         }
     
     return summaries
-
-
-
-
-
-
-
 
 
 print("Data in testCollection:")
