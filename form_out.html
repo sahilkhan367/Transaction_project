@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Submit Form</title>
+</head>
+<body>
+  <h2>Employee Form</h2>
+  <form id="myForm">
+    <label>Name:</label>
+    <input type="text" id="Name" name="Name" required><br><br>
+
+    <label>RFID:</label>
+    <input type="text" id="RFID" name="RFID" required><br><br>
+
+    <label>Employee ID:</label>
+    <input type="text" id="EmployeeID" name="Employee ID" required><br><br>
+
+    <button type="submit">Submit</button>
+    <a href="/list.html">View All Data</a>
+  </form>
+
+  <p id="response"></p>
+
+  <script>
+    document.getElementById("myForm").addEventListener("submit", async function(e) {
+      e.preventDefault();
+
+      const data = {
+        "Name": document.getElementById("Name").value,
+        "RFID": document.getElementById("RFID").value,
+        "Employee ID": document.getElementById("EmployeeID").value
+      };
+
+      try {
+        const res = await fetch("http://10.80.5.209:8000/submit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data)
+        });
+
+        const result = await res.json();
+        document.getElementById("response").innerText = result.message;
+      } catch (err) {
+        document.getElementById("response").innerText = "Error submitting form!";
+      }
+    });
+  </script>
+</body>
+</html>

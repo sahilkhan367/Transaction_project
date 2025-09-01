@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Employee Logs</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #f4f6f9;
+            padding: 20px;
+        }
+        h2 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #333;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: center;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background: #667eea;
+            color: white;
+            text-transform: uppercase;
+            font-size: 14px;
+        }
+        tr:hover {
+            background: #f8f9fa;
+        }
+        .late {
+            color: red;
+            font-weight: bold;
+        }
+        .absent {
+            color: red;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h2>Employee Logs</h2>
+    <table id="logsTable">
+        <thead>
+            <tr>
+                <th>Employee Name</th>
+                <th>Date</th>
+                <th>Log In Time</th>
+                <th>Log Out Time</th>
+                <th>Total Hours</th>
+                <th>Effective Login</th>
+                <th>Total Login</th>
+                <th>Break Hours</th>
+                <th>Late Status</th>
+                <th>Comments</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <script>
+        fetch("http://10.80.5.209:8000/logs")
+            .then(response => response.json())
+            .then(data => {
+                let tbody = document.querySelector("#logsTable tbody");
+                data.forEach(log => {
+                    let tr = document.createElement("tr");
+
+                    // Calculate Late/Absent status (example: if Total_login < 1hr → Late)
+                    let lateStatus = "On Time";
+                    let comments = "In/Out Entry";
+                    if (!log.login_time || !log.logout_time) {
+                        lateStatus = "Not Available";
+                        comments = "Absent";
+                    } else if (log.Total_login && log.Total_login < "0:15:00") {
+                        lateStatus = "Late";
+                    }
+
+                    tr.innerHTML = `
+                        <td>${log.name}</td>
+                        <td>${log.date}</td>
+                        <td>${log.login_time || "Not Available"}</td>
+                        <td>${log.logout_time || "Not Available"}</td>
+                        <td>${log.Total_login || "Not Available"}</td>
+                        <td>${log.Effective_login || "Not Available"}</td>
+                        <td>${log.Total_login || "Not Available"}</td>
+                        <td>${log.Break_hours || "Not Available"}</td>
+                        <td class="${lateStatus === "Late" ? "late" : ""}">${lateStatus}</td>
+                        <td class="${comments === "Absent" ? "absent" : ""}">${comments}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            })
+            .catch(err => console.error("Error loading logs:", err));
+    </script>
+</body>
+</html>
