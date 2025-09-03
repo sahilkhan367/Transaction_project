@@ -1,0 +1,204 @@
+from flask import Flask, request, render_template, redirect, url_for, jsonify
+from pymongo import MongoClient
+from bson.objectid import ObjectId
+from datetime import datetime, timedelta
+from collections import defaultdict
+import pymongo 
+from flask_cors import CORS
+import threading
+
+app = Flask(__name__)
+CORS(app)  # <-- allow all origins
+
+lock = threading.Lock()
+priority_active = threading.Event()
+
+# Connect to MongoDB
+client = MongoClient("mongodb://localhost:27017/")
+db = client["Transaction_project"]
+collection = db["users"]
+
+
+
+def process_all_logs(logs, result_container ):
+    grouped_logs = defaultdict(list)
+    for log in logs:
+        grouped_logs[(log["Name"], log["RFID"], log["date"])].append(log)
+    
+    summaries = []  # <-- make this a list, not a dict
+    
+    for (name, rfid, date), person_logs in grouped_logs.items():
+        logs_sorted = sorted(person_logs, key=lambda x: x["time"])
+        
+        for log in logs_sorted:
+            log["datetime"] = datetime.strptime(f'{log["date"]} {log["time"]}', "%Y-%m-%d %H:%M:%S")
+        
+        login_time, logout_time = None, None
+        total_login, errors, last_action, in_time = 0, [], None, None
+        
+        for log in logs_sorted:
+            action = log["IN/OUT"]
+            
+            if action == "IN":
+                if last_action == "IN":
+                    errors.append(f"Transaction Error at {log['time']}: consecutive IN")
+                else:
+                    if login_time is None:
+                        login_time = log["datetime"]
+                    in_time = log["datetime"]
+            
+            elif action == "OUT":
+                if last_action == "OUT":
+                    errors.append(f"Transaction Error at {log['time']}: consecutive OUT")
+                else:
+                    if in_time:
+                        total_login += (log["datetime"] - in_time).total_seconds()
+                    logout_time = log["datetime"]
+                    in_time = None
+            
+            last_action = action
+        
+        total_break = 0
+        if login_time and logout_time:
+            total_duration = (logout_time - login_time).total_seconds()
+            total_break = total_duration - total_login
+            time_spent = str(logout_time - login_time)
+        else:
+            time_spent = None
+        
+        summaries.append({
+            "name": name,
+            "rfid": rfid,
+            "date": date,
+            "login_time": login_time.strftime("%H:%M:%S") if login_time else None,
+            "logout_time": logout_time.strftime("%H:%M:%S") if logout_time else None,
+            "Effective_login": str(timedelta(seconds=total_login)),
+            "Break_hours": str(timedelta(seconds=total_break)),
+            "Total_login": time_spent,
+            "errors": errors
+        })
+    
+    #return summaries
+    result_container["summary"] = summaries   # store result in shared container
+
+
+
+
+
+
+@app.route('/submit', methods=['POST'])
+def submit():
+    data = request.get_json()
+    if not data:
+        return jsonify({"status": "error", "message": "No data received"}), 400
+    
+    collection.insert_one(data)
+    return jsonify({"status": "success", "message": "Data saved"}), 201
+
+# ---------- READ ----------
+@app.route('/list', methods=['GET'])
+def get_list():
+    docs = list(collection.find({}, {"_id": 1, "Name": 1, "RFID": 1, "Employee ID": 1}))
+    # convert ObjectId to string
+    for d in docs:
+        d["_id"] = str(d["_id"])
+    return jsonify(docs)
+
+# ---------- UPDATE ----------
+@app.route('/update/<id>', methods=['PUT'])
+def update(id):
+    data = request.get_json()
+    if not data:
+        return jsonify({"status": "error", "message": "No data received"}), 400
+    
+    result = collection.update_one(
+        {"_id": ObjectId(id)},
+        {"$set": {
+            "Name": data.get("Name"),
+            "RFID": data.get("RFID"),
+            "Employee ID": data.get("Employee ID")
+        }}
+    )
+    if result.modified_count > 0:
+        return jsonify({"status": "success", "message": "Record updated"})
+    return jsonify({"status": "error", "message": "Record not found"}), 404
+
+# ---------- DELETE ----------
+@app.route('/delete/<id>', methods=['DELETE'])
+def delete(id):
+    result = collection.delete_one({"_id": ObjectId(id)})
+    if result.deleted_count > 0:
+        return jsonify({"status": "success", "message": "Record deleted"})
+    return jsonify({"status": "error", "message": "Record not found"}), 404
+
+# ---------- LOGS ----------
+def create_log(data):
+    logs_collection = db["logs"]
+
+    if "_id" in data:
+        del data["_id"]   # avoid duplicate IDs
+    data["_id"] = ObjectId()
+
+    result = logs_collection.insert_one(data)
+    print("Inserted document ID:", result.inserted_id)
+
+@app.route("/logs", methods=["GET"])
+def view_logs():
+    logs_collection = db["logs"]
+    logs = list(logs_collection.find({}, {"_id": 0}))
+    result_container = {}
+    # You can still call your summary processor
+    thread = threading.Thread(target=process_all_logs, args=(logs, result_container))
+    thread.start()
+    thread.join() 
+    return jsonify(result_container["summary"])
+
+# ---- SIMPLE API ENDPOINT (Accept & Return Success) ----
+@app.route('/api/submit', methods=['POST'])
+def api_submit():
+    global priority_active
+    priority_active.set()
+    with lock:
+        try:
+            if not request.is_json:
+                return jsonify({"status": "error", "message": "Content-Type must be application/json"}), 400
+        
+            data = request.get_json(silent=True)
+            print(data)
+            if not data:
+                return jsonify({"status": "error", "message": "Invalid or empty JSON"}), 400
+        
+            rfid = data.get("RFID")
+            if not rfid:
+                return jsonify({"status": "error", "message": "Missing RFID field"}), 400
+        
+            # Ensure index for fast lookup
+            collection.create_index("RFID")
+            result = collection.find_one({"RFID": rfid})
+            if result:
+                merged_dict={**data, **result}
+                now_time_date = datetime.now()
+                merged_dict["date"] = now_time_date.strftime("%Y-%m-%d")   # e.g. "2025-08-28"
+                merged_dict["time"] = now_time_date.strftime("%H:%M:%S")   # e.g. "10:45:33"
+                print(merged_dict)
+                thread = threading.Thread(target=create_log, args=(merged_dict,))    #creats background jobs to creat logs
+                thread.start()
+                #create_log(merged_dict)
+        
+            if not result:
+                return jsonify({
+                    "status": "error",
+                    "message": f"No data found for RFID {rfid}"
+                }), 404   # Not Found
+        
+            # Convert ObjectId to string for JSON
+            result["_id"] = str(result["_id"])
+        
+            return jsonify({
+                "status": "success",
+            }), 200
+        finally:
+            priority_active.clear()
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=8000, debug=True)
