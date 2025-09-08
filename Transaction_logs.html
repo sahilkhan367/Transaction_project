@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Logs Viewer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-6">
+  <div class="max-w-5xl mx-auto bg-white p-6 rounded-2xl shadow-md">
+    <h1 class="text-2xl font-bold mb-4">Logs Viewer</h1>
+
+    <!-- Filters -->
+    <div class="flex flex-wrap gap-4 mb-6">
+      <!-- Names multi-select -->
+      <div>
+        <label class="block font-medium mb-1">Select Names</label>
+        <select id="nameSelect" multiple class="border rounded p-2 w-64">
+          <option value="anirudh.k@noveloffice.in">anirudh.k@noveloffice.in</option>
+          <option value="sahil.k@noveloffice.in">sahil.k@noveloffice.in</option>
+          <option value="test.user@noveloffice.in">test.user@noveloffice.in</option>
+          <!-- you can dynamically load options if you want -->
+        </select>
+        <p class="text-xs text-gray-500">Hold Ctrl (Windows) or Cmd (Mac) to select multiple</p>
+      </div>
+
+      <!-- Date picker -->
+      <div>
+        <label class="block font-medium mb-1">Select Date</label>
+        <input type="date" id="dateInput" class="border rounded p-2" />
+      </div>
+
+      <!-- Fetch button -->
+      <div class="flex items-end">
+        <button onclick="fetchLogs()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+          Fetch Logs
+        </button>
+      </div>
+    </div>
+
+    <!-- Results table -->
+    <div>
+      <table class="w-full border-collapse border border-gray-300">
+        <thead>
+          <tr class="bg-gray-200">
+            <th class="border p-2">Name</th>
+            <th class="border p-2">RFID</th>
+            <th class="border p-2">Date</th>
+            <th class="border p-2">Login</th>
+            <th class="border p-2">Logout</th>
+            <th class="border p-2">Effective Login</th>
+            <th class="border p-2">Break Hours</th>
+            <th class="border p-2">Total Login</th>
+            <th class="border p-2">Errors</th>
+          </tr>
+        </thead>
+        <tbody id="logsTable" class="text-center">
+          <!-- Data will be inserted here -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    async function fetchLogs() {
+      const selectedNames = Array.from(document.getElementById("nameSelect").selectedOptions).map(o => o.value);
+      const date = document.getElementById("dateInput").value;
+
+      if (!selectedNames.length || !date) {
+        alert("Please select at least one name and a date.");
+        return;
+      }
+
+      // Build query string
+      const query = new URLSearchParams();
+      selectedNames.forEach(name => query.append("name", name));
+      query.append("date", date);
+
+      // Call API
+      const response = await fetch(`http://localhost:8000/logs?${query.toString()}`);
+      const data = await response.json();
+
+      // Update table
+      const table = document.getElementById("logsTable");
+      table.innerHTML = ""; // clear old rows
+
+      data.forEach(log => {
+        const row = `
+          <tr>
+            <td class="border p-2">${log.name}</td>
+            <td class="border p-2">${log.rfid}</td>
+            <td class="border p-2">${log.date}</td>
+            <td class="border p-2">${log.login_time || "-"}</td>
+            <td class="border p-2">${log.logout_time || "-"}</td>
+            <td class="border p-2">${log.Effective_login}</td>
+            <td class="border p-2">${log.Break_hours}</td>
+            <td class="border p-2">${log.Total_login || "-"}</td>
+            <td class="border p-2 text-red-600">${log.errors.join(", ") || "-"}</td>
+          </tr>
+        `;
+        table.insertAdjacentHTML("beforeend", row);
+      });
+    }
+  </script>
+</body>
+</html>

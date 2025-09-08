@@ -20,12 +20,12 @@ collection = db["users"]
 
 
 
-def process_all_logs(logs, result_container ):
+def process_all_logs(logs, result_container):
     grouped_logs = defaultdict(list)
     for log in logs:
         grouped_logs[(log["Name"], log["RFID"], log["date"])].append(log)
     
-    summaries = []  # <-- make this a list, not a dict
+    summaries = []
     
     for (name, rfid, date), person_logs in grouped_logs.items():
         logs_sorted = sorted(person_logs, key=lambda x: x["time"])
@@ -34,30 +34,33 @@ def process_all_logs(logs, result_container ):
             log["datetime"] = datetime.strptime(f'{log["date"]} {log["time"]}', "%Y-%m-%d %H:%M:%S")
         
         login_time, logout_time = None, None
-        total_login, errors, last_action, in_time = 0, [], None, None
+        total_login, errors = 0, []
+        in_time = None
         
         for log in logs_sorted:
             action = log["IN/OUT"]
-            
+
             if action == "IN":
-                if last_action == "IN":
-                    errors.append(f"Transaction Error at {log['time']}: consecutive IN")
+                if in_time is None:
+                    in_time = log["datetime"]   # start session
+                    if login_time is None:      # first login of the day
+                        login_time = in_time
                 else:
-                    if login_time is None:
-                        login_time = log["datetime"]
-                    in_time = log["datetime"]
+                    errors.append(f"Duplicate IN at {log['time']}")
             
             elif action == "OUT":
-                if last_action == "OUT":
-                    errors.append(f"Transaction Error at {log['time']}: consecutive OUT")
-                else:
-                    if in_time:
-                        total_login += (log["datetime"] - in_time).total_seconds()
-                    logout_time = log["datetime"]
+                if in_time is not None:
+                    total_login += (log["datetime"] - in_time).total_seconds()
+                    logout_time = log["datetime"]   # last valid logout
                     in_time = None
-            
-            last_action = action
+                else:
+                    errors.append(f"Unexpected OUT at {log['time']}")
         
+        # If day ends with an IN but no OUT
+        if in_time is not None:
+            errors.append(f"Missing OUT after {in_time.strftime('%H:%M:%S')}")
+        
+        # Calculate break time and total duration
         total_break = 0
         if login_time and logout_time:
             total_duration = (logout_time - login_time).total_seconds()
@@ -78,10 +81,8 @@ def process_all_logs(logs, result_container ):
             "errors": errors
         })
     
-    #return summaries
-    result_container["summary"] = summaries   # store result in shared container
-
-
+    # store result in shared container
+    result_container["summary"] = summaries
 
 
 
@@ -145,13 +146,28 @@ def create_log(data):
 @app.route("/logs", methods=["GET"])
 def view_logs():
     logs_collection = db["logs"]
-    logs = list(logs_collection.find({}, {"_id": 0}))
+
+    # --- Read query parameters ---
+    names = request.args.getlist("name")   # multiple ?name=Alice&name=Bob
+    date = request.args.get("date")        # e.g. "2025-09-08"
+
+    # --- Build filter dynamically ---
+    query = {}
+    if names:
+        query["Name"] = {"$in": names}
+    if date:
+        query["date"] = date
+
+    # --- Fetch filtered logs ---
+    logs = list(logs_collection.find(query, {"_id": 0}))
+
+    # --- Process logs with your function ---
     result_container = {}
-    # You can still call your summary processor
     thread = threading.Thread(target=process_all_logs, args=(logs, result_container))
     thread.start()
-    thread.join() 
-    return jsonify(result_container["summary"])
+    thread.join()
+
+    return jsonify(result_container.get("summary", []))
 
 # ---- SIMPLE API ENDPOINT (Accept & Return Success) ----
 @app.route('/api/submit', methods=['POST'])

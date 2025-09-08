@@ -78,28 +78,22 @@ function processAllLogs(logs) {
             const action = log["IN/OUT"];
             
             if (action === "IN") {
-                if (lastAction === "IN") {
-                    errors.push(`Transaction Error at ${log.time}: consecutive IN`);
-                } else {
-                    if (loginTime === null) {
-                        loginTime = log.datetime;
-                    }
-                    inTime = log.datetime;
+                if (loginTime === null) {
+                    loginTime = log.datetime;
                 }
+                inTime = log.datetime;
             } else if (action === "OUT") {
-                if (lastAction === "OUT") {
-                    errors.push(`Transaction Error at ${log.time}: consecutive OUT`);
-                } else {
-                    if (inTime) {
-                        totalLogin += (log.datetime - inTime) / 1000; // Convert to seconds
-                    }
-                    logoutTime = log.datetime;
-                    inTime = null;
+                if (inTime) {
+                    totalLogin += (log.datetime - inTime) / 1000; // Convert to seconds
                 }
+                logoutTime = log.datetime;
+                inTime = null;
             }
             
             lastAction = action;
         }
+        
+        // Temporarily disabled all error checking
         
         let totalBreak = 0;
         let timeSpent = null;
@@ -156,6 +150,23 @@ async function createLog(data) {
 }
 
 // Routes
+
+// Root route
+app.get('/', (req, res) => {
+    res.json({
+        message: "Transaction Project API Server",
+        status: "running",
+        endpoints: {
+            "POST /api/submit": "Submit RFID transaction (main endpoint)",
+            "POST /submit": "Create new user",
+            "GET /list": "Get all users",
+            "PUT /update/:id": "Update user",
+            "DELETE /delete/:id": "Delete user",
+            "GET /logs": "Get transaction logs"
+        },
+        timestamp: new Date().toISOString()
+    });
+});
 
 // Submit data
 app.post('/submit', async (req, res) => {
