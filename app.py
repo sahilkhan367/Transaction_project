@@ -20,68 +20,225 @@ collection = db["users"]
 
 
 
-def process_all_logs(logs, result_container):
+from collections import defaultdict
+from datetime import datetime, timedelta
+
+
+from collections import defaultdict
+from datetime import datetime, timedelta
+
+def process_all_logs(logs, result_container, query_name=None, query_rfid=None, query_date=None):
+    """
+    logs: list of log dicts (may be empty)
+    result_container: dict used to store "summary"
+    query_name: str or list of names (from query)
+    query_rfid: str or list of rfids (from query)
+    query_date: str date (from query)
+    """
+
+    # Normalize query inputs to lists
+    def to_list(x):
+        if x is None:
+            return []
+        if isinstance(x, list):
+            return x
+        if isinstance(x, str) and "," in x:
+            return [i.strip() for i in x.split(",") if i.strip()]
+        return [x]
+
+    q_names = to_list(query_name)
+    q_rfids = to_list(query_rfid)
+    q_date = query_date if query_date else ""
+
+    # If no logs at all → return Absent rows using original query details
+    if not logs:
+        summaries = []
+        if q_names and q_rfids and len(q_names) == len(q_rfids):
+            for n, r in zip(q_names, q_rfids):
+                summaries.append({
+                    "name": n,
+                    "rfid": r,
+                    "date": q_date,
+                    "login_time": "",
+                    "logout_time": "",
+                    "Effective_login": "",
+                    "Break_hours": "",
+                    "Total_login": "",
+                    "errors": "Absent"
+                })
+        elif q_names:
+            first_rfid = q_rfids[0] if q_rfids else ""
+            for n in q_names:
+                summaries.append({
+                    "name": n,
+                    "rfid": first_rfid,
+                    "date": q_date,
+                    "login_time": "",
+                    "logout_time": "",
+                    "Effective_login": "",
+                    "Break_hours": "",
+                    "Total_login": "",
+                    "errors": "Absent"
+                })
+        elif q_rfids:
+            first_name = q_names[0] if q_names else ""
+            for r in q_rfids:
+                summaries.append({
+                    "name": first_name,
+                    "rfid": r,
+                    "date": q_date,
+                    "login_time": "",
+                    "logout_time": "",
+                    "Effective_login": "",
+                    "Break_hours": "",
+                    "Total_login": "",
+                    "errors": "Absent"
+                })
+        else:
+            summaries.append({
+                "name": "",
+                "rfid": "",
+                "date": q_date,
+                "login_time": "",
+                "logout_time": "",
+                "Effective_login": "",
+                "Break_hours": "",
+                "Total_login": "",
+                "errors": "Absent"
+            })
+
+        result_container["summary"] = summaries
+        return
+
+    # --- Normal processing when logs exist ---
     grouped_logs = defaultdict(list)
     for log in logs:
-        grouped_logs[(log["Name"], log["RFID"], log["date"])].append(log)
+        grouped_logs[(log.get("Name", ""), log.get("RFID", ""), log.get("date", ""))].append(log)
     
     summaries = []
-    
+    present_pairs = set()
+    present_names = set()
+    present_rfids = set()
+
     for (name, rfid, date), person_logs in grouped_logs.items():
-        logs_sorted = sorted(person_logs, key=lambda x: x["time"])
+        present_pairs.add((name, rfid))
+        present_names.add(name)
+        present_rfids.add(rfid)
+
+        logs_sorted = sorted(person_logs, key=lambda x: x.get("time", ""))
         
+        # defensive datetime parsing
         for log in logs_sorted:
-            log["datetime"] = datetime.strptime(f'{log["date"]} {log["time"]}', "%Y-%m-%d %H:%M:%S")
+            dt_str_date = log.get("date", "")
+            dt_str_time = log.get("time", "")
+            try:
+                log["datetime"] = datetime.strptime(f'{dt_str_date} {dt_str_time}', "%Y-%m-%d %H:%M:%S")
+            except Exception:
+                log["datetime"] = None
         
         login_time, logout_time = None, None
-        total_login, errors = 0, []
+        total_login = 0
+        errors = []
         in_time = None
         
         for log in logs_sorted:
-            action = log["IN/OUT"]
+            action = log.get("IN/OUT", "")
+            dt = log.get("datetime")
 
             if action == "IN":
                 if in_time is None:
-                    in_time = log["datetime"]   # start session
-                    if login_time is None:      # first login of the day
-                        login_time = in_time
+                    if dt:
+                        in_time = dt
+                        if login_time is None:
+                            login_time = in_time
+                    else:
+                        errors.append(f"Bad IN datetime at {log.get('time', '')}")
                 else:
-                    errors.append(f"Duplicate IN at {log['time']}")
+                    errors.append(f"Duplicate IN at {log.get('time', '')}")
             
             elif action == "OUT":
-                if in_time is not None:
-                    total_login += (log["datetime"] - in_time).total_seconds()
-                    logout_time = log["datetime"]   # last valid logout
+                if in_time is not None and dt:
+                    total_login += (dt - in_time).total_seconds()
+                    logout_time = dt
                     in_time = None
                 else:
-                    errors.append(f"Unexpected OUT at {log['time']}")
+                    errors.append(f"Unexpected OUT at {log.get('time', '')}")
         
-        # If day ends with an IN but no OUT
         if in_time is not None:
-            errors.append(f"Missing OUT after {in_time.strftime('%H:%M:%S')}")
+            try:
+                errors.append(f"Missing OUT after {in_time.strftime('%H:%M:%S')}")
+            except Exception:
+                errors.append("Missing OUT after unknown time")
         
-        # Calculate break time and total duration
         total_break = 0
         if login_time and logout_time:
             total_duration = (logout_time - login_time).total_seconds()
             total_break = total_duration - total_login
             time_spent = str(logout_time - login_time)
         else:
-            time_spent = None
+            time_spent = ""
         
         summaries.append({
             "name": name,
             "rfid": rfid,
             "date": date,
-            "login_time": login_time.strftime("%H:%M:%S") if login_time else None,
-            "logout_time": logout_time.strftime("%H:%M:%S") if logout_time else None,
-            "Effective_login": str(timedelta(seconds=total_login)),
-            "Break_hours": str(timedelta(seconds=total_break)),
+            "login_time": login_time.strftime("%H:%M:%S") if login_time else "",
+            "logout_time": logout_time.strftime("%H:%M:%S") if logout_time else "",
+            "Effective_login": str(timedelta(seconds=total_login)) if total_login else "",
+            "Break_hours": str(timedelta(seconds=total_break)) if total_break else "",
             "Total_login": time_spent,
-            "errors": errors
+            "errors": errors if errors else "Absent"
         })
-    
-    # store result in shared container
+
+    # --- Add Absent rows for requested names/rfids that weren't present in DB result --- #
+    # Pairwise when lengths match
+    if q_names and q_rfids and len(q_names) == len(q_rfids):
+        for n, r in zip(q_names, q_rfids):
+            if (n, r) not in present_pairs:
+                summaries.append({
+                    "name": n,
+                    "rfid": r,
+                    "date": q_date,
+                    "login_time": "",
+                    "logout_time": "",
+                    "Effective_login": "",
+                    "Break_hours": "",
+                    "Total_login": "",
+                    "errors": "Absent"
+                })
+    # If only names requested -> add per name not present
+    elif q_names:
+        first_rfid = q_rfids[0] if q_rfids else ""
+        for n in q_names:
+            if n not in present_names:
+                summaries.append({
+                    "name": n,
+                    "rfid": first_rfid,
+                    "date": q_date,
+                    "login_time": "",
+                    "logout_time": "",
+                    "Effective_login": "",
+                    "Break_hours": "",
+                    "Total_login": "",
+                    "errors": "Absent"
+                })
+    # If only rfids requested -> add per rfid not present
+    elif q_rfids:
+        first_name = q_names[0] if q_names else ""
+        for r in q_rfids:
+            if r not in present_rfids:
+                summaries.append({
+                    "name": first_name,
+                    "rfid": r,
+                    "date": q_date,
+                    "login_time": "",
+                    "logout_time": "",
+                    "Effective_login": "",
+                    "Break_hours": "",
+                    "Total_login": "",
+                    "errors": "Absent"
+                })
+
     result_container["summary"] = summaries
 
 
@@ -149,25 +306,50 @@ def view_logs():
 
     # --- Read query parameters ---
     names = request.args.getlist("name")   # multiple ?name=Alice&name=Bob
+    rfids = request.args.getlist("rfid")   # optional ?rfid=...
     date = request.args.get("date")        # e.g. "2025-09-08"
+
+    # --- Debug: log what we received (temporary) ---
+    app.logger.debug("QUERY params - names: %s, rfids: %s, date: %s", names, rfids, date)
 
     # --- Build filter dynamically ---
     query = {}
     if names:
         query["Name"] = {"$in": names}
+    if rfids:
+        query["RFID"] = {"$in": rfids}
     if date:
         query["date"] = date
 
+    app.logger.debug("Mongo query: %s", query)
+
     # --- Fetch filtered logs ---
     logs = list(logs_collection.find(query, {"_id": 0}))
+    app.logger.debug("Found %d logs", len(logs))
+    if logs:
+        app.logger.debug("Sample log: %s", logs[0])
 
-    # --- Process logs with your function ---
+    # --- Process logs with your function (pass original query params) ---
     result_container = {}
-    thread = threading.Thread(target=process_all_logs, args=(logs, result_container))
+    thread = threading.Thread(
+        target=process_all_logs,
+        args=(logs, result_container, names or None, rfids or None, date or None)
+    )
     thread.start()
     thread.join()
 
-    return jsonify(result_container.get("summary", []))
+    # Always return the summary (guaranteed by process_all_logs)
+    return jsonify(result_container.get("summary", [{
+        "name": "",
+        "rfid": "",
+        "date": date or "",
+        "login_time": "",
+        "logout_time": "",
+        "Effective_login": "",
+        "Break_hours": "",
+        "Total_login": "",
+        "errors": "Absent"
+    }]))
 
 # ---- SIMPLE API ENDPOINT (Accept & Return Success) ----
 @app.route('/api/submit', methods=['POST'])
