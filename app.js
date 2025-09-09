@@ -42,12 +42,94 @@ async function connectToMongo() {
 }
 
 // Process logs function (converted from Python)
-function processAllLogs(logs) {
+function processAllLogs(logs, resultContainer, queryName = null, queryRfid = null, queryDate = null) {
+    // Normalize query inputs to arrays
+    function toList(x) {
+        if (x === null || x === undefined) {
+            return [];
+        }
+        if (Array.isArray(x)) {
+            return x;
+        }
+        if (typeof x === 'string' && x.includes(',')) {
+            return x.split(',').map(item => item.trim()).filter(item => item);
+        }
+        return [x];
+    }
+
+    const qNames = toList(queryName);
+    const qRfids = toList(queryRfid);
+    const qDate = queryDate || "";
+
+    // If no logs at all → return Absent rows using original query details
+    if (!logs || logs.length === 0) {
+        const summaries = [];
+        if (qNames.length > 0 && qRfids.length > 0 && qNames.length === qRfids.length) {
+            for (let i = 0; i < qNames.length; i++) {
+                summaries.push({
+                    name: qNames[i],
+                    rfid: qRfids[i],
+                    date: qDate,
+                    login_time: "",
+                    logout_time: "",
+                    Effective_login: "",
+                    Break_hours: "",
+                    Total_login: "",
+                    errors: "Absent"
+                });
+            }
+        } else if (qNames.length > 0) {
+            const firstRfid = qRfids.length > 0 ? qRfids[0] : "";
+            for (const name of qNames) {
+                summaries.push({
+                    name: name,
+                    rfid: firstRfid,
+                    date: qDate,
+                    login_time: "",
+                    logout_time: "",
+                    Effective_login: "",
+                    Break_hours: "",
+                    Total_login: "",
+                    errors: "Absent"
+                });
+            }
+        } else if (qRfids.length > 0) {
+            const firstName = qNames.length > 0 ? qNames[0] : "";
+            for (const rfid of qRfids) {
+                summaries.push({
+                    name: firstName,
+                    rfid: rfid,
+                    date: qDate,
+                    login_time: "",
+                    logout_time: "",
+                    Effective_login: "",
+                    Break_hours: "",
+                    Total_login: "",
+                    errors: "Absent"
+                });
+            }
+        } else {
+            summaries.push({
+                name: "",
+                rfid: "",
+                date: qDate,
+                login_time: "",
+                logout_time: "",
+                Effective_login: "",
+                Break_hours: "",
+                Total_login: "",
+                errors: "Absent"
+            });
+        }
+
+        resultContainer.summary = summaries;
+        return;
+    }
+
+    // --- Normal processing when logs exist ---
     const groupedLogs = new Map();
-    
-    // Group logs by name, rfid, and date
     for (const log of logs) {
-        const key = `${log.Name}-${log.RFID}-${log.date}`;
+        const key = `${log.Name || ''}-${log.RFID || ''}-${log.date || ''}`;
         if (!groupedLogs.has(key)) {
             groupedLogs.set(key, []);
         }
@@ -55,48 +137,74 @@ function processAllLogs(logs) {
     }
     
     const summaries = [];
-    
+    const presentPairs = new Set();
+    const presentNames = new Set();
+    const presentRfids = new Set();
+
     for (const [key, personLogs] of groupedLogs) {
         const [name, rfid, date] = key.split('-');
-        
+        presentPairs.add(`${name}-${rfid}`);
+        presentNames.add(name);
+        presentRfids.add(rfid);
+
         // Sort logs by time
-        const logsSorted = personLogs.sort((a, b) => a.time.localeCompare(b.time));
+        const logsSorted = personLogs.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
         
         // Add datetime property
         for (const log of logsSorted) {
-            log.datetime = new Date(`${log.date} ${log.time}`);
+            const dtStrDate = log.date || "";
+            const dtStrTime = log.time || "";
+            try {
+                log.datetime = new Date(`${dtStrDate} ${dtStrTime}`);
+            } catch (error) {
+                log.datetime = null;
+            }
         }
         
         let loginTime = null;
         let logoutTime = null;
         let totalLogin = 0;
         let errors = [];
-        let lastAction = null;
         let inTime = null;
         
         for (const log of logsSorted) {
-            const action = log["IN/OUT"];
-            
+            const action = log["IN/OUT"] || "";
+            const dt = log.datetime;
+
             if (action === "IN") {
-                if (loginTime === null) {
-                    loginTime = log.datetime;
+                if (inTime === null) {
+                    if (dt) {
+                        inTime = dt;
+                        if (loginTime === null) {
+                            loginTime = inTime;
+                        }
+                    } else {
+                        errors.push(`Bad IN datetime at ${log.time || ''}`);
+                    }
+                } else {
+                    errors.push(`Duplicate IN at ${log.time || ''}`);
                 }
-                inTime = log.datetime;
             } else if (action === "OUT") {
-                if (inTime) {
-                    totalLogin += (log.datetime - inTime) / 1000; // Convert to seconds
+                if (inTime !== null && dt) {
+                    totalLogin += (dt - inTime) / 1000; // Convert to seconds
+                    logoutTime = dt;
+                    inTime = null;
+                } else {
+                    errors.push(`Unexpected OUT at ${log.time || ''}`);
                 }
-                logoutTime = log.datetime;
-                inTime = null;
             }
-            
-            lastAction = action;
         }
         
-        // Temporarily disabled all error checking
+        if (inTime !== null) {
+            try {
+                errors.push(`Missing OUT after ${inTime.toTimeString().split(' ')[0]}`);
+            } catch (error) {
+                errors.push("Missing OUT after unknown time");
+            }
+        }
         
         let totalBreak = 0;
-        let timeSpent = null;
+        let timeSpent = "";
         
         if (loginTime && logoutTime) {
             const totalDuration = (logoutTime - loginTime) / 1000; // Convert to seconds
@@ -108,16 +216,75 @@ function processAllLogs(logs) {
             name: name,
             rfid: rfid,
             date: date,
-            login_time: loginTime ? formatTime(loginTime) : null,
-            logout_time: logoutTime ? formatTime(logoutTime) : null,
-            Effective_login: formatDuration(totalLogin * 1000),
-            Break_hours: formatDuration(totalBreak * 1000),
+            login_time: loginTime ? formatTime(loginTime) : "",
+            logout_time: logoutTime ? formatTime(logoutTime) : "",
+            Effective_login: totalLogin > 0 ? formatDuration(totalLogin * 1000) : "",
+            Break_hours: totalBreak > 0 ? formatDuration(totalBreak * 1000) : "",
             Total_login: timeSpent,
-            errors: errors
+            errors: errors.length > 0 ? errors : "Absent"
         });
     }
-    
-    return summaries;
+
+    // --- Add Absent rows for requested names/rfids that weren't present in DB result ---
+    // Pairwise when lengths match
+    if (qNames.length > 0 && qRfids.length > 0 && qNames.length === qRfids.length) {
+        for (let i = 0; i < qNames.length; i++) {
+            const pairKey = `${qNames[i]}-${qRfids[i]}`;
+            if (!presentPairs.has(pairKey)) {
+                summaries.push({
+                    name: qNames[i],
+                    rfid: qRfids[i],
+                    date: qDate,
+                    login_time: "",
+                    logout_time: "",
+                    Effective_login: "",
+                    Break_hours: "",
+                    Total_login: "",
+                    errors: "Absent"
+                });
+            }
+        }
+    }
+    // If only names requested -> add per name not present
+    else if (qNames.length > 0) {
+        const firstRfid = qRfids.length > 0 ? qRfids[0] : "";
+        for (const name of qNames) {
+            if (!presentNames.has(name)) {
+                summaries.push({
+                    name: name,
+                    rfid: firstRfid,
+                    date: qDate,
+                    login_time: "",
+                    logout_time: "",
+                    Effective_login: "",
+                    Break_hours: "",
+                    Total_login: "",
+                    errors: "Absent"
+                });
+            }
+        }
+    }
+    // If only rfids requested -> add per rfid not present
+    else if (qRfids.length > 0) {
+        const firstName = qNames.length > 0 ? qNames[0] : "";
+        for (const rfid of qRfids) {
+            if (!presentRfids.has(rfid)) {
+                summaries.push({
+                    name: firstName,
+                    rfid: rfid,
+                    date: qDate,
+                    login_time: "",
+                    logout_time: "",
+                    Effective_login: "",
+                    Break_hours: "",
+                    Total_login: "",
+                    errors: "Absent"
+                });
+            }
+        }
+    }
+
+    resultContainer.summary = summaries;
 }
 
 // Helper functions for time formatting
@@ -265,9 +432,53 @@ app.delete('/delete/:id', async (req, res) => {
 app.get('/logs', async (req, res) => {
     try {
         if (mongoConnected) {
-            const logs = await logsCollection.find({}, { projection: { _id: 0 } }).toArray();
-            const summary = processAllLogs(logs);
-            res.json(summary);
+            const logsCollection = db.collection("logs");
+
+            // --- Read query parameters ---
+            const names = req.query.name ? (Array.isArray(req.query.name) ? req.query.name : [req.query.name]) : [];
+            const rfids = req.query.rfid ? (Array.isArray(req.query.rfid) ? req.query.rfid : [req.query.rfid]) : [];
+            const date = req.query.date || null;
+
+            // --- Debug: log what we received (temporary) ---
+            console.log("QUERY params - names:", names, "rfids:", rfids, "date:", date);
+
+            // --- Build filter dynamically ---
+            const query = {};
+            if (names.length > 0) {
+                query["Name"] = { $in: names };
+            }
+            if (rfids.length > 0) {
+                query["RFID"] = { $in: rfids };
+            }
+            if (date) {
+                query["date"] = date;
+            }
+
+            console.log("Mongo query:", query);
+
+            // --- Fetch filtered logs ---
+            const logs = await logsCollection.find(query, { projection: { _id: 0 } }).toArray();
+            console.log("Found", logs.length, "logs");
+            if (logs.length > 0) {
+                console.log("Sample log:", logs[0]);
+            }
+
+            // --- Process logs with your function (pass original query params) ---
+            const resultContainer = {};
+            processAllLogs(logs, resultContainer, names.length > 0 ? names : null, rfids.length > 0 ? rfids : null, date);
+
+            // Always return the summary (guaranteed by processAllLogs)
+            res.json(resultContainer.summary || [{
+                name: "",
+                rfid: "",
+                date: date || "",
+                login_time: "",
+                logout_time: "",
+                Effective_login: "",
+                Break_hours: "",
+                Total_login: "",
+                errors: "Absent"
+            }]);
         } else {
             res.json(mockLogs);
         }

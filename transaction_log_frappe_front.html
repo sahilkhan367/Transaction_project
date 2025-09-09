@@ -1,0 +1,418 @@
+<div class="dashboard">
+    <h2>Transaction Dashboard</h2>
+  
+    <div class="controls">
+      <label for="dateSelect" style="color:#e6eef8; font-size:30px;">Select Date:</label>
+  
+      <input type="date" id="dateSelect">
+    </div>
+  
+    <div class="panel">
+      <h3 style="color: white;">Departments</h3>
+  
+      <div id="docContainer" class="dept-list"></div>
+    </div>
+  
+    <div class="details">
+      <h3 style="color: white;">Details</h3>
+      <div id="docDetails" class="msg">Select a department and date to view logs.</div>
+    </div>
+  </div>
+  
+
+
+
+
+
+
+
+
+
+
+  // app.js - updated: if user is not TL/Admin, show "Show My Logs" for their email
+  (async function () {
+      const API_BASE_LOGS = 'http://10.80.5.209:8000'; // logs service
+      let userName = "";
+  
+      function escapeHtml(text) {
+          if (text === null || text === undefined) return "";
+          return String(text)
+              .replace(/&/g, "&amp;")
+              .replace(/</g, "&lt;")
+              .replace(/>/g, "&gt;")
+              .replace(/"/g, "&quot;")
+              .replace(/'/g, "&#039;");
+      }
+  
+      function showMessage(html) {
+          const detailsDiv = document.getElementById("docDetails");
+          if (detailsDiv) detailsDiv.innerHTML = html;
+      }
+  
+      async function fetchJson(url, opts) {
+          const res = await fetch(url, opts);
+          if (!res.ok) {
+              const text = await res.text().catch(() => "");
+              throw new Error(`Request failed ${res.status} ${res.statusText} ${text}`);
+          }
+          return res.json();
+      }
+  
+      async function callLogsAndRender(emails, selectedDate, label) {
+          const detailsDiv = document.getElementById("docDetails");
+          if (!detailsDiv) return;
+  
+          if (!selectedDate) {
+              detailsDiv.innerHTML = `<p style="color:crimson">Please select a date first.</p>`;
+              return;
+          }
+  
+          if (!emails || emails.length === 0) {
+              detailsDiv.innerHTML = `<p>No employees found for ${escapeHtml(label || '')}.</p>`;
+              return;
+          }
+  
+          const params = new URLSearchParams();
+          emails.forEach(email => params.append("name", email));
+          params.append("date", selectedDate);
+  
+          const apiUrl = `${API_BASE_LOGS}/logs?${params.toString()}`;
+          console.log("Calling logs API:", apiUrl);
+  
+          try {
+              const logs = await fetchJson(apiUrl);
+  
+              if (!Array.isArray(logs) || logs.length === 0) {
+                  detailsDiv.innerHTML = `<p>No logs found for ${escapeHtml(selectedDate)}.</p>`;
+                  return;
+              }
+  
+              const employeesHtml = label ? `
+                  <div style="margin-bottom:10px;">
+                      <strong>Source:</strong> ${escapeHtml(label)}<br>
+                      <strong>Employees:</strong> ${emails.map(e => escapeHtml(e)).join(', ')}
+                  </div>
+              ` : '';
+  
+              let tableHtml = `
+                  ${employeesHtml}
+                  <h3 style="color: white;">Logs for ${escapeHtml(selectedDate)}</h3>
+                  <table class="logs-table" style="border-collapse:collapse; width:100%;">
+                      <thead style="background:#f0f0f0;">
+                          <tr>
+                              <th style="border:1px solid #ddd;padding:6px;">Name</th>
+                              <th style="border:1px solid #ddd;padding:6px;">RFID</th>
+                              <th style="border:1px solid #ddd;padding:6px;">Login</th>
+                              <th style="border:1px solid #ddd;padding:6px;">Logout</th>
+                              <th style="border:1px solid #ddd;padding:6px;">Effective Login</th>
+                              <th style="border:1px solid #ddd;padding:6px;">Break Hours</th>
+                              <th style="border:1px solid #ddd;padding:6px;">Total Login</th>
+                              <th style="border:1px solid #ddd;padding:6px;">Errors</th>
+                          </tr>
+                      </thead>
+                      <tbody>
+              `;
+  
+              logs.forEach(l => {
+                  const errors = (Array.isArray(l.errors) && l.errors.length) ? l.errors.join(", ") : "-";
+                  tableHtml += `
+                      <tr>
+                          <td style="border:1px solid #eee;padding:6px;">${escapeHtml(l.name || "-")}</td>
+                          <td style="border:1px solid #eee;padding:6px;">${escapeHtml(l.rfid || "-")}</td>
+                          <td style="border:1px solid #eee;padding:6px;">${escapeHtml(l.login_time || "-")}</td>
+                          <td style="border:1px solid #eee;padding:6px;">${escapeHtml(l.logout_time || "-")}</td>
+                          <td style="border:1px solid #eee;padding:6px;">${escapeHtml(l.Effective_login || "-")}</td>
+                          <td style="border:1px solid #eee;padding:6px;">${escapeHtml(l.Break_hours || "-")}</td>
+                          <td style="border:1px solid #eee;padding:6px;">${escapeHtml(l.Total_login || "-")}</td>
+                          <td style="border:1px solid #eee;padding:6px;color:crimson;">${escapeHtml(errors)}</td>
+                      </tr>
+                  `;
+              });
+  
+              tableHtml += `</tbody></table>`;
+              detailsDiv.innerHTML = tableHtml;
+          } catch (err) {
+              console.error("Error fetching logs:", err);
+              detailsDiv.innerHTML = `<p style="color:crimson">Error fetching logs. Check console for details.</p>`;
+          }
+      }
+  
+      try {
+          // 1) get logged user
+          const userResp = await fetchJson('/api/method/frappe.auth.get_logged_user');
+          userName = userResp.message;
+  
+          if (!userName || userName === "Guest") {
+              console.log("Guest detected → redirecting to login");
+              const currentPage = window.location.href;
+              window.location.href = `/login?redirect-to=${encodeURIComponent(currentPage)}`;
+              return;
+          }
+  
+          console.log("Current User:", userName);
+  
+          // 2) fetch User doc to check roles
+          const userDocResp = await fetchJson(`/api/resource/User/${encodeURIComponent(userName)}`);
+          const userDoc = userDocResp && userDocResp.data;
+          if (!userDoc) {
+              console.log("Unable to fetch user document");
+              return;
+          }
+  
+          const roles = (userDoc.roles || []).map(r => r.role);
+          console.log("User Roles:", roles);
+  
+          const container = document.getElementById("docContainer");
+          if (!container) {
+              console.error("Missing #docContainer in HTML");
+              return;
+          }
+          container.innerHTML = ""; // clear
+  
+          // If TL/Admin: show department buttons (existing behavior)
+          if (roles.includes("Transaction TL") || roles.includes("Transaction Admin")) {
+              let deptQueryUrl;
+              if (roles.includes("Transaction TL")) {
+                  deptQueryUrl = `/api/resource/Transaction_Departments?filters=[["tl_email","=","${userName}"]]`;
+              } else {
+                  deptQueryUrl = `/api/resource/Transaction_Departments`;
+              }
+  
+              const deptResp = await fetchJson(deptQueryUrl);
+              const deptDocs = deptResp && deptResp.data;
+              if (!deptDocs || deptDocs.length === 0) {
+                  showMessage(`<p>No departments found for this user.</p>`);
+                  return;
+              }
+  
+              // create buttons per department
+              deptDocs.forEach(doc => {
+                  const btn = document.createElement("button");
+                  btn.type = "button";
+                  btn.innerText = doc.name;
+                  btn.className = "dept-button";
+                  btn.style.margin = "6px";
+                  btn.style.padding = "8px 12px";
+                  btn.style.cursor = "pointer";
+  
+                  btn.addEventListener("click", async () => {
+                      try {
+                          const detailResp = await fetchJson(`/api/resource/Transaction_Departments/${encodeURIComponent(doc.name)}`);
+                          const detail = detailResp && detailResp.data;
+                          if (!detail) {
+                              showMessage(`<p>Unable to fetch details for ${escapeHtml(doc.name)}</p>`);
+                              return;
+                          }
+  
+                          const employeeArr = Array.isArray(detail.employee) ? detail.employee : [];
+                          const employeeEmails = employeeArr.map(emp => emp.employee_email).filter(Boolean);
+  
+                          const selectedDate = document.getElementById("dateSelect").value;
+                          await callLogsAndRender(employeeEmails, selectedDate, doc.name);
+                      } catch (err) {
+                          console.error("Error loading department details:", err);
+                          showMessage(`<p style="color:crimson">Error loading department details. See console.</p>`);
+                      }
+                  });
+  
+                  container.appendChild(btn);
+              });
+  
+              return; // exit after setting up TL/Admin UI
+          }
+  
+          // If not TL/Admin -> show single button "Show My Logs"
+          const myBtn = document.createElement("button");
+          myBtn.type = "button";
+          myBtn.innerText = "Show My Logs";
+          myBtn.style.margin = "6px";
+          myBtn.style.padding = "8px 12px";
+          myBtn.style.cursor = "pointer";
+  
+          myBtn.addEventListener("click", async () => {
+              const selectedDate = document.getElementById("dateSelect").value;
+              await callLogsAndRender([userName], selectedDate, userName);
+          });
+  
+          container.appendChild(myBtn);
+  
+      } catch (err) {
+          console.error("Unexpected error:", err);
+          showMessage(`<p style="color:crimson">Unexpected error occurred. See console for details.</p>`);
+      }
+  })();
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  .web-footer,
+  .navbar {
+      display: none !important;
+  }
+  
+  
+  
+/* style.css - Transaction TL Dashboard (stacked layout) */
+
+/* --- base --- */
+:root {
+--bg: #0f172a;
+--accent: #4f46e5;
+--accent-2: #06b6d4;
+--muted: #94a3b8;
+--danger: #ef4444;
+}
+
+* { box-sizing: border-box; }
+body {
+margin: 0;
+padding: 20px;
+font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+background: linear-gradient(180deg, #071020 0%, #071226 100%);
+color: #e6eef8;
+}
+
+/* main card */
+.dashboard {
+max-width: 800px;
+margin: 0 auto;
+}
+
+/* header */
+.dashboard h2 {
+font-size: 22px;
+margin-bottom: 20px;
+text-align: center;
+font-weight: 700;
+color: #f8fbff;
+}
+
+/* controls */
+.controls {
+display: flex;
+gap: 10px;
+justify-content: center;
+margin-bottom: 20px;
+}
+
+#dateSelect {
+background: #0b1220;
+border: 1px solid rgba(255,255,255,0.1);
+border-radius: 6px;
+padding: 8px 10px;
+color: #e6eef8;
+}
+
+button {
+background: linear-gradient(90deg, var(--accent), var(--accent-2));
+color: white;
+padding: 8px 14px;
+border: none;
+border-radius: 6px;
+cursor: pointer;
+font-weight: 600;
+transition: transform .1s ease, box-shadow .1s ease;
+}
+button:hover {
+transform: translateY(-2px);
+box-shadow: 0 6px 16px rgba(79,70,229,0.3);
+}
+
+/* stacked boxes */
+.panel, .details {
+background: rgba(255,255,255,0.02);
+border: 1px solid rgba(255,255,255,0.06);
+border-radius: 10px;
+padding: 16px;
+margin-bottom: 20px;
+}
+
+/* departments list */
+/* departments list */
+.dept-list {
+display: grid;
+grid-template-columns: repeat(auto-fill, minmax(45%, 1fr));
+gap: 12px;
+margin-top: 10px;
+}
+
+.dept-button {
+padding: 12px 14px;
+border-radius: 8px;
+border: 1px solid rgba(255,255,255,0.08);
+background: rgba(255,255,255,0.04);
+color: #dbeafe;
+cursor: pointer;
+font-weight: 600;
+text-align: center;
+transition: all 0.2s ease;
+}
+
+.dept-button:hover {
+background: rgba(79,70,229,0.2);
+border-color: rgba(79,70,229,0.4);
+transform: translateY(-2px);
+}
+
+/* logs table */
+.logs-table {
+width: 100%;
+border-collapse: collapse;
+font-size: 14px;
+margin-top: 12px;
+}
+.logs-table th, .logs-table td {
+padding: 8px 10px;
+border: 1px solid rgba(255,255,255,0.08);
+text-align: left;
+}
+.logs-table th {
+background: #06b6d4;
+
+color: white;
+font-weight: 600;
+}
+.logs-table td {
+color: #e6eef8;
+}
+.logs-table tr:hover td {
+background: rgba(79,70,229,0.1);
+}
+
+/* messages */
+.msg {
+padding: 10px;
+border-radius: 6px;
+background: rgba(255,255,255,0.04);
+color: var(--muted);
+font-size: 14px;
+}
+
+/* highlight errors */
+.error-pill {
+display: inline-block;
+padding: 4px 8px;
+border-radius: 999px;
+background: rgba(239,68,68,0.15);
+color: var(--danger);
+font-weight: 600;
+font-size: 12px;
+}
