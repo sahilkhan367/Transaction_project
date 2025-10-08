@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Cabins — List</title>
+  <style>
+    :root{
+      --bg:#0f1724;
+      --card:#0b1220;
+      --muted:#94a3b8;
+      --accent:#6ee7b7;
+      --glass: rgba(255,255,255,0.04);
+      --glass-2: rgba(255,255,255,0.02);
+      --shadow: 0 6px 18px rgba(2,6,23,0.6);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+    html,body{height:100%}
+    body{
+      margin:0;
+      background: linear-gradient(180deg,#051025 0%, #071427 60%);
+      color:#e6eef6;
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+      padding:28px;
+      box-sizing:border-box;
+    }
+
+    .app {
+      max-width:1100px;
+      margin:0 auto;
+    }
+
+    header {
+      display:flex;
+      gap:18px;
+      align-items:center;
+      justify-content:space-between;
+      margin-bottom:20px;
+    }
+
+    .title {
+      display:flex;
+      gap:12px;
+      align-items:center;
+    }
+    .logo {
+      width:56px;height:56px;border-radius:12px;background:
+      linear-gradient(135deg,var(--accent),#60a5fa);
+      display:grid;place-items:center;font-weight:700;color:#022;box-shadow:var(--shadow);
+    }
+    h1{font-size:20px;margin:0}
+    p.lead{margin:0;color:var(--muted);font-size:13px}
+
+    .controls{
+      display:flex;
+      gap:12px;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+
+    .search {
+      display:flex;
+      align-items:center;
+      gap:8px;
+      background:var(--glass);
+      padding:8px 12px;
+      border-radius:10px;
+      box-shadow:inset 0 -1px 0 rgba(255,255,255,0.02);
+      min-width:220px;
+    }
+    .search input{
+      background:transparent;border:0;color:inherit;outline:none;font-size:14px;
+      width:220px;
+    }
+
+    .select, .btn {
+      background:var(--glass-2);
+      border:1px solid rgba(255,255,255,0.03);
+      color:var(--muted);
+      padding:8px 12px;border-radius:10px;font-size:13px;cursor:pointer;
+    }
+    .btn.primary {
+      background: linear-gradient(90deg,var(--accent),#60a5fa);
+      color:#012;
+      border:none;
+      font-weight:600;
+      box-shadow:0 6px 16px rgba(80,200,160,0.12);
+    }
+
+    /* layout toggle */
+    .view-toggle{display:flex;gap:8px}
+    .view-toggle button{padding:8px;border-radius:8px;border:0;cursor:pointer;background:var(--glass-2);color:var(--muted)}
+    .view-toggle button.active{background:rgba(255,255,255,0.06);color:#e6eef6}
+
+    main{
+      margin-top:18px;
+    }
+
+    .grid {
+      display:grid;
+      gap:14px;
+      grid-template-columns: repeat(3,1fr);
+    }
+    @media (max-width:1000px){ .grid{grid-template-columns:repeat(2,1fr)} }
+    @media (max-width:640px){ .grid{grid-template-columns:repeat(1,1fr)} }
+
+    .card{
+      background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border-radius:14px;
+      padding:14px;
+      box-shadow:var(--shadow);
+      border:1px solid rgba(255,255,255,0.03);
+      transition:transform .18s ease, box-shadow .18s ease;
+    }
+    .card:hover{transform:translateY(-6px);box-shadow:0 18px 36px rgba(2,6,23,0.6)}
+    .badge {
+      padding:6px 10px;border-radius:999px;font-weight:700;font-size:12px;
+      background:rgba(255,255,255,0.03);
+      color:var(--accent);
+      border:1px solid rgba(255,255,255,0.03);
+    }
+
+    .room {font-size:18px;margin:8px 0 4px}
+    .sub {color:var(--muted);font-size:13px;margin:0}
+    .chip-row{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+    .chip{padding:6px 10px;border-radius:999px;background:var(--glass-2);font-size:13px;color:var(--muted);border:1px solid rgba(255,255,255,0.02)}
+
+    .table-wrap{overflow:auto;background:var(--card);border-radius:12px;padding:8px;border:1px solid rgba(255,255,255,0.03)}
+    table{width:100%;border-collapse:collapse;color:inherit}
+    th,td{padding:10px 12px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.02)}
+    th{font-size:13px;color:var(--muted);position:sticky;top:0;background:transparent}
+    tr:hover td{background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent)}
+
+    .empty {text-align:center;padding:40px;border-radius:12px;background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent);color:var(--muted);}
+    footer{margin-top:18px;text-align:center;color:var(--muted);font-size:13px}
+
+    .actions {display:flex;gap:8px;margin-top:10px;}
+    .btn.sm {font-size:12px;padding:4px 8px;border-radius:6px;border:none;cursor:pointer;}
+    .btn.update {background:#3b82f6;color:#fff;}
+    .btn.delete {background:#ef4444;color:#fff;}
+    .btn.done {background:#22c55e;color:#fff;font-weight:600;margin-left:8px;}
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <header>
+      <div class="title">
+        <div class="logo">CAB</div>
+        <div>
+          <h1>Cabin Directory</h1>
+          <p class="lead">Live list | visually browse cabins returned from your API</p>
+        </div>
+      </div>
+
+      <div class="controls">
+        <div class="search" title="Search by building / door / floor / ID">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="opacity:.8">
+            <path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+            <circle cx="11" cy="11" r="6" stroke="currentColor" stroke-width="2"></circle>
+          </svg>
+          <input id="q" placeholder="Search (building, door, floor, id)..." />
+        </div>
+
+        <select id="sort" class="select" title="Sort by">
+          <option value="building">Sort: Building (A→Z)</option>
+          <option value="floor">Sort: Floor (ascending)</option>
+          <option value="id">Sort: ID (ascending)</option>
+        </select>
+
+        <div class="view-toggle" role="tablist" aria-label="View">
+          <button id="cardsBtn" class="active" aria-pressed="true">Cards</button>
+          <button id="tableBtn">Table</button>
+        </div>
+
+        <a href="./create_doors.html" id="refresh" class="btn primary">Add cabin</a>
+        <button id="doneBtn" class="btn done">Done</button>
+      </div>
+    </header>
+
+    <main>
+      <div id="content"><div class="empty">Loading cabins…</div></div>
+    </main>
+  </div>
+
+  <script>
+    const API_URL = 'https://accesshub.novelinfra.com/list_cabin';
+    const SAMPLE = [
+      {"Building":"NOW","Door":"BMS Cabin","Floor":"78","ID":"08"},
+      {"Building":"NOM","Door":"facility","Floor":"99","ID":"52"},
+      {"Building":"NOZ","Door":"facility_xyz","Floor":"999","ID":"89"},
+      {"Building":"NBP","Door":"bhbdqf","Floor":"7","ID":"454"}
+    ];
+    
+    let cabins = [];
+    let selectedLogCabin = localStorage.getItem("selectedLogCabin") || null;
+    
+    async function fetchCabins() {
+      try {
+        const res = await fetch(API_URL);
+        const data = await res.json();
+        cabins = Array.isArray(data) ? data : SAMPLE;
+      } catch {
+        cabins = SAMPLE;
+      }
+      render();
+    }
+    
+    function toggleSelection(id) {
+      selectedLogCabin = id;
+      localStorage.setItem("selectedLogCabin", id);
+    
+      document.querySelectorAll(".select-cabin").forEach(cb => {
+        cb.checked = (cb.dataset.id === id);
+      });
+    }
+    
+    function render() {
+      const content = document.getElementById("content");
+      content.innerHTML = "";
+      const grid = document.createElement("div");
+      grid.className = "grid";
+    
+      cabins.forEach(it => {
+        const checked = selectedLogCabin === it.ID ? "checked" : "";
+        grid.innerHTML += `
+          <div class="card">
+            <div style="display:flex;align-items:center;gap:10px">
+              <input type="checkbox" class="select-cabin" data-id="${it.ID}" ${checked}>
+              <div>
+                <div class="room">${it.Door}</div>
+                <div class="sub">Building • ${it.Building}</div>
+              </div>
+            </div>
+            <div class="badge">ID ${it.ID}</div>
+          </div>`;
+      });
+      content.appendChild(grid);
+    
+      document.querySelectorAll(".select-cabin").forEach(cb => {
+        cb.addEventListener("change", e => toggleSelection(e.target.dataset.id));
+      });
+    }
+    
+    document.getElementById("doneBtn").addEventListener("click", () => {
+      if (selectedLogCabin)
+        alert("✅ Log Cabin selected: " + selectedLogCabin);
+      else
+        alert("⚠️ No log cabin selected!");
+      window.location.href = "Transaction_register.html";
+    });
+    
+    fetchCabins();
+    </script>
+</body>
+</html>

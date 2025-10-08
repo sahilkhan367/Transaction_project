@@ -1,34 +1,272 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Update Employee</title>
+  <style>
+    * { box-sizing: border-box; }
+    body, h2, p {
+      margin: 0;
+      padding: 0;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      background: linear-gradient(135deg, #74ebd5 0%, #ACB6E5 100%);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 18px;
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    h2 {
+      color: #1f2937;
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+      text-align: center;
+    }
+
+    form {
+      background: #fff;
+      padding: 28px 34px;
+      border-radius: 14px;
+      box-shadow: 0 12px 30px rgba(18, 38, 63, 0.12);
+      width: 100%;
+      max-width: 420px;
+      text-align: left;
+      animation: fadeIn 0.6s ease-in-out;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #374151;
+      font-size: 13px;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid #e6e6e9;
+      border-radius: 8px;
+      outline: none;
+      margin-bottom: 18px;
+      transition: border 0.18s, box-shadow 0.18s;
+      font-size: 14px;
+      background: #fafafa;
+    }
+
+    input[type="text"]:focus {
+      border-color: #7c5cff;
+      box-shadow: 0 6px 18px rgba(124, 92, 255, 0.12);
+      background: #fff;
+    }
+
+    .form-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      justify-content: flex-start;
+      margin-top: 6px;
+    }
+
+    button {
+      background: linear-gradient(180deg,#7c5cff,#5f44e6);
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 14px;
+      box-shadow: 0 8px 18px rgba(92, 67, 230, 0.18);
+      transition: transform 0.12s, box-shadow 0.12s;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 28px rgba(92, 67, 230, 0.22);
+    }
+
+    a {
+      display: inline-flex;
+      align-items: center;
+      padding: 8px 12px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 13px;
+      color: #5f44e6;
+      background: rgba(95,68,230,0.06);
+      border: 1px solid rgba(95,68,230,0.08);
+      transition: background 0.12s, color 0.12s, transform 0.12s;
+    }
+
+    a:hover {
+      background: rgba(95,68,230,0.12);
+      color: #3d25b8;
+      transform: translateY(-1px);
+    }
+
+    #response {
+      margin-top: 10px;
+      font-weight: 600;
+      color: #0f172a;
+      text-align: center;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 420px) {
+      form { padding: 20px; border-radius: 12px; }
+      .form-actions { flex-direction: column; align-items: stretch; }
+      a { justify-content: center; width: 100%; }
+    }
+  </style>
+</head>
+
 <body>
-    <h2>Update Record</h2>
-    <form id="updateForm">
-        <label>Name:</label>
-        <input type="text" id="name"><br>
-        <label>RFID:</label>
-        <input type="text" id="rfid"><br>
-        <label>Employee ID:</label>
-        <input type="text" id="empId"><br>
-        <button type="submit">Update</button>
-    </form>
+  <h2>Update Employee</h2>
+  <form id="updateForm" novalidate>
+    <label>Name:</label>
+    <input type="text" id="Name" name="Name" required>
 
-    <script>
-        const API_BASE = "http://10.80.5.209:8000"; // adjust
-        const urlParams = new URLSearchParams(window.location.search);
-        const id = urlParams.get("id");
+    <label>RFID:</label>
+    <input type="text" id="RFID" name="RFID" required>
 
-        document.getElementById("updateForm").addEventListener("submit", async (e) => {
-            e.preventDefault();
-            const name = document.getElementById("name").value;
-            const rfid = document.getElementById("rfid").value;
-            const empId = document.getElementById("empId").value;
+    <div class="form-actions">
+      <button type="button" id="selectCabin">Select Cabin Access</button>
+    </div>
+    <div id="selected-cabin">No cabin selected</div>
 
-            const res = await fetch(`${API_BASE}/update/${id}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ Name: name, RFID: rfid, "Employee ID": empId })
-            });
-            const result = await res.json();
-            alert(result.message);
-            window.location.href = "list.html"; // go back to list page
+    <div class="form-actions">
+      <button type="button" id="selectLogCabin">Select Log Cabin</button>
+    </div>
+    <div id="selected-log-cabin">No log cabin selected</div>
+
+    <div class="form-actions">
+      <button type="submit">Update</button>
+      <a href="./list.html">⬅ Back</a>
+    </div>
+  </form>
+
+  <p id="response"></p>
+
+  <script>
+    const API_BASE = "https://accesshub.novelinfra.com";
+    const id = new URLSearchParams(window.location.search).get("id");
+
+    // Debug log
+    console.log("🟢 Update page loaded with ID:", id);
+
+    if (!id) {
+      document.getElementById("response").innerText = "❌ Invalid URL — No ID provided";
+      document.getElementById("response").style.color = "red";
+    }
+
+    // Load the existing record
+    async function loadRecord() {
+      try {
+        const res = await fetch(`${API_BASE}/list`);
+        const all = await res.json();
+        const record = all.find(d => d._id === id);
+        if (!record) throw new Error("Record not found");
+
+        document.getElementById("Name").value = record.Name || "";
+        document.getElementById("RFID").value = record.RFID || "";
+        localStorage.setItem("selectedCabins", JSON.stringify(record.Cabins || []));
+        localStorage.setItem("selectedLogCabin", record.Log_Cabin || null);
+        updateSelectedDisplays();
+      } catch (err) {
+        document.getElementById("response").innerText = "⚠ " + err.message;
+        document.getElementById("response").style.color = "red";
+      }
+    }
+
+    function updateSelectedDisplays() {
+      const selectedCabins = JSON.parse(localStorage.getItem("selectedCabins")) || [];
+      const selectedLogCabin = localStorage.getItem("selectedLogCabin") || null;
+
+      document.getElementById("selected-cabin").textContent =
+        selectedCabins.length > 0
+          ? "Selected Cabin IDs: " + selectedCabins.join(", ")
+          : "No cabin selected";
+
+      document.getElementById("selected-log-cabin").textContent =
+        selectedLogCabin
+          ? "Selected Log Cabin: " + selectedLogCabin
+          : "No log cabin selected";
+    }
+
+    function saveFormInputs() {
+      const name = document.getElementById("Name").value.trim();
+      const rfid = document.getElementById("RFID").value.trim();
+      localStorage.setItem("formName", name);
+      localStorage.setItem("formRFID", rfid);
+    }
+
+    document.getElementById("selectCabin").addEventListener("click", () => {
+      saveFormInputs();
+      window.location.href = `select_cabin.html?from=update&id=${id}`;
+    });
+
+    document.getElementById("selectLogCabin").addEventListener("click", () => {
+      saveFormInputs();
+      window.location.href = `select_log_cabin.html?from=update&id=${id}`;
+    });
+
+    // ✅ Corrected Update function (calls /update/<id> with PUT)
+    document.getElementById("updateForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const name = document.getElementById("Name").value.trim();
+      const rfid = document.getElementById("RFID").value.trim();
+      const cabins = JSON.parse(localStorage.getItem("selectedCabins")) || [];
+      const logCabin = localStorage.getItem("selectedLogCabin") || null;
+
+      if (!id) {
+        document.getElementById("response").innerText = "❌ Missing record ID!";
+        document.getElementById("response").style.color = "red";
+        return;
+      }
+
+      const data = { Name: name, RFID: rfid, Cabins: cabins, Log_Cabin: logCabin };
+
+      console.log("📡 Sending PUT request to:", `${API_BASE}/update/${id}`);
+      console.log("📦 Payload:", data);
+
+      try {
+        const res = await fetch(`${API_BASE}/update/${id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data)
         });
-    </script>
+
+        const result = await res.json();
+        console.log("🧭 Server response:", result);
+
+        if (result.status === "success") {
+          document.getElementById("response").innerText = "✅ Record updated successfully!";
+          document.getElementById("response").style.color = "green";
+          localStorage.clear();
+          setTimeout(() => (window.location.href = "list.html"), 800);
+        } else {
+          throw new Error(result.message || "Update failed");
+        }
+      } catch (err) {
+        document.getElementById("response").innerText = "❌ " + err.message;
+        document.getElementById("response").style.color = "red";
+      }
+    });
+
+    loadRecord();
+  </script>
 </body>
+</html>

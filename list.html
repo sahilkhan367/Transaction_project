@@ -1,119 +1,191 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>All Data</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px;
-        }
-        .content-wrapper {
-            background: white; padding: 40px; border-radius: 20px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-            width: 100%; max-width: 900px;
-            animation: slideUp 0.6s ease-out;
-        }
-        @keyframes slideUp { from {opacity:0; transform:translateY(30px);} to {opacity:1; transform:translateY(0);} }
-        h2 {
-            color:#333; text-align:center; margin-bottom:30px; font-size:2.2em; font-weight:600; position:relative;
-        }
-        h2::after {
-            content:''; position:absolute; bottom:-10px; left:50%; transform:translateX(-50%);
-            width:60px; height:3px; background:linear-gradient(90deg,#667eea,#764ba2); border-radius:2px;
-        }
-        table {
-            width:100%; border-collapse:collapse; margin-bottom:20px;
-            border-radius:12px; overflow:hidden; box-shadow:0 5px 15px rgba(0,0,0,0.1);
-        }
-        th {
-            background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
-            color:white; padding:15px; text-align:left; font-weight:600; font-size:0.95em;
-            text-transform:uppercase; letter-spacing:0.5px;
-        }
-        td { padding:15px; border-bottom:1px solid #e1e5e9; background:white; transition:background-color 0.3s ease; }
-        tr:hover td { background:#f8f9fa; }
-        tr:last-child td { border-bottom:none; }
-        button {
-            background:none; border:none; color:#667eea; font-weight:500;
-            cursor:pointer; padding:5px 10px; border-radius:6px; transition:all 0.3s ease;
-        }
-        button:hover {
-            background:#667eea; color:white; transform:translateY(-1px);
-            box-shadow:0 3px 8px rgba(102,126,234,0.3);
-        }
-        @media (max-width:768px) {
-            .content-wrapper { padding:30px 20px; margin:10px; }
-            h2 { font-size:1.8em; }
-            table { font-size:14px; }
-            th, td { padding:10px 8px; }
-        }
-        @media (max-width:600px) {
-            table { display:block; overflow-x:auto; white-space:nowrap; }
-            th, td { padding:8px 6px; font-size:12px; }
-        }
-        tr { animation:fadeIn 0.5s ease-in-out; }
-        @keyframes fadeIn { from {opacity:0; transform:translateY(10px);} to {opacity:1; transform:translateY(0);} }
-    </style>
+  <title>Stored Employee Data</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+    .content-wrapper {
+      background: white;
+      padding: 40px;
+      border-radius: 20px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+      width: 100%;
+      max-width: 950px;
+      animation: slideUp 0.6s ease-out;
+    }
+    @keyframes slideUp {
+      from {opacity:0; transform:translateY(30px);}
+      to {opacity:1; transform:translateY(0);}
+    }
+    h2 {
+      color:#333;
+      text-align:center;
+      margin-bottom:30px;
+      font-size:2.2em;
+      font-weight:600;
+      position:relative;
+    }
+    h2::after {
+      content:'';
+      position:absolute;
+      bottom:-10px;
+      left:50%;
+      transform:translateX(-50%);
+      width:60px;
+      height:3px;
+      background:linear-gradient(90deg,#667eea,#764ba2);
+      border-radius:2px;
+    }
+    table {
+      width:100%;
+      border-collapse:collapse;
+      margin-bottom:20px;
+      border-radius:12px;
+      overflow:hidden;
+      box-shadow:0 5px 15px rgba(0,0,0,0.1);
+    }
+    th {
+      background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+      color:white;
+      padding:15px;
+      text-align:left;
+      font-weight:600;
+      font-size:0.95em;
+      text-transform:uppercase;
+      letter-spacing:0.5px;
+    }
+    td {
+      padding:15px;
+      border-bottom:1px solid #e1e5e9;
+      background:white;
+      transition:background-color 0.3s ease;
+    }
+    tr:hover td { background:#f8f9fa; }
+    tr:last-child td { border-bottom:none; }
+    button {
+      background:none;
+      border:none;
+      color:#667eea;
+      font-weight:500;
+      cursor:pointer;
+      padding:5px 10px;
+      border-radius:6px;
+      transition:all 0.3s ease;
+    }
+    button:hover {
+      background:#667eea;
+      color:white;
+      transform:translateY(-1px);
+      box-shadow:0 3px 8px rgba(102,126,234,0.3);
+    }
+    a {
+      display:inline-block;
+      margin-top:15px;
+      color:#667eea;
+      text-decoration:none;
+      font-weight:600;
+      transition:color 0.2s ease;
+    }
+    a:hover { color:#4a56d6; text-decoration:underline; }
+  </style>
 </head>
 <body>
-    <div class="content-wrapper">
-        <h2>Stored Data</h2>
-        <table id="dataTable">
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th>RFID</th>
-                    <th>Employee ID</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody id="tableBody"></tbody>
-        </table>
-        <br>
-        <a href="form_out.html">Insert New Data</a>
-    </div>
+  <div class="content-wrapper">
+    <h2>Stored Employee Data</h2>
+    <table id="dataTable">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>RFID</th>
+          <th>Cabins</th>
+          <th>Log Cabin</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+    <a href="Transaction_register.html">➕ Insert New Data</a>
+  </div>
 
-    <script>
-        const API_BASE = "http://10.80.5.209:8000";
-
-        async function fetchData() {
-            const res = await fetch(`${API_BASE}/list`);
-            const data = await res.json();
-            const tableBody = document.getElementById("tableBody");
-            tableBody.innerHTML = "";
-
-            data.forEach(doc => {
-                const row = document.createElement("tr");
-                row.innerHTML = `
-                    <td>${doc.Name || ""}</td>
-                    <td>${doc.RFID || ""}</td>
-                    <td>${doc["Employee ID"] || ""}</td>
-                    <td>
-                        <button onclick="goToUpdate('${doc._id}')">Update</button>
-                        <button onclick="deleteRecord('${doc._id}')">Delete</button>
-                    </td>
-                `;
-                tableBody.appendChild(row);
-            });
+  <script>
+    const API_BASE = "https://accesshub.novelinfra.com";
+  
+    async function fetchData() {
+      try {
+        const res = await fetch(`${API_BASE}/list`);
+        const data = await res.json();
+        console.log("Fetched data:", data); // 🧠 Debug line
+        const tableBody = document.getElementById("tableBody");
+        tableBody.innerHTML = "";
+  
+        if (!Array.isArray(data) || data.length === 0) {
+          tableBody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:#999;padding:20px;">No data available</td></tr>`;
+          return;
         }
-
-        async function deleteRecord(id) {
-            if (!confirm("Are you sure you want to delete this record?")) return;
-            const res = await fetch(`${API_BASE}/delete/${id}`, { method: "DELETE" });
-            const result = await res.json();
-            alert(result.message);
-            fetchData();
-        }
-
-        function goToUpdate(id) {
-        // redirect to update.html with query param
-        window.location.href = `update.html?id=${id}`;
+  
+        data.forEach(doc => {
+          const name = doc.Name || "";
+          const rfid = doc.RFID || "";
+          const cabins = doc.Cabins || [];
+          const logCabin = doc.Log_Cabin || "";
+  
+          // 🧩 Format cabins nicely
+          const cabinsDisplay = Array.isArray(cabins)
+            ? (cabins.length > 3
+                ? cabins.slice(0, 3).join(", ") + "..."
+                : cabins.join(", "))
+            : cabins;
+  
+          const fullCabinsTooltip = Array.isArray(cabins)
+            ? cabins.join(", ")
+            : cabins;
+  
+          const row = document.createElement("tr");
+          row.innerHTML = `
+            <td>${name}</td>
+            <td>${rfid}</td>
+            <td title="${fullCabinsTooltip}">${cabinsDisplay}</td>
+            <td>${logCabin}</td>
+            <td>
+              <button onclick="goToUpdate('${doc._id}')">Update</button>
+              <button onclick="deleteRecord('${doc._id}')">Delete</button>
+            </td>
+          `;
+          tableBody.appendChild(row);
+        });
+      } catch (err) {
+        console.error(err);
+        alert("⚠️ Failed to load data from API!");
+      }
     }
-
-        // Load data on page load
+  
+    async function deleteRecord(id) {
+      if (!confirm("Are you sure you want to delete this record?")) return;
+      try {
+        const res = await fetch(`${API_BASE}/delete/${id}`, { method: "DELETE" });
+        const result = await res.json();
+        alert(result.message || "Record deleted successfully!");
         fetchData();
-    </script>
+      } catch (err) {
+        alert("Error deleting record!");
+      }
+    }
+  
+    function goToUpdate(id) {
+      window.location.href = `update.html?id=${id}`;
+    }
+  
+    // ✅ Fetch on load
+    document.addEventListener("DOMContentLoaded", fetchData);
+  </script>
 </body>
 </html>

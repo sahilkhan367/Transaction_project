@@ -1,0 +1,122 @@
+nohup: ignoring input
+(node:235830) [MONGODB DRIVER] Warning: Current Server Discovery and Monitoring engine is deprecated, and will be removed in a future version. To use the new Server Discover and Monitoring engine, pass option { useUnifiedTopology: true } to the MongoClient constructor.
+Connected to MongoDB
+Server is running on http://0.0.0.0:8000
+✅ MongoDB connected successfully
+{ RFID: '123456789' }
+{ RFID: '123456789' }
+{ RFID: '1' }
+{
+  RFID: '1',
+  _id: 68bfd2fee55d74f09c2e39b4,
+  Name: 'sahil.k@noveloffice.in',
+  'Employee ID': '1771',
+  date: '2025-09-11',
+  time: '05:36:20'
+}
+Inserted document ID: 68c25fd4b496d79939011cd4
+{ RFID: '1' }
+{
+  RFID: '1',
+  _id: 68bfd2fee55d74f09c2e39b4,
+  Name: 'sahil.k@noveloffice.in',
+  'Employee ID': '1771',
+  date: '2025-09-11',
+  time: '05:36:33'
+}
+Inserted document ID: 68c25fe1b496d79939011cd5
+{ ID: '01', RFID: '1', 'IN/OUT': 'OUT' }
+{
+  ID: '01',
+  RFID: '1',
+  'IN/OUT': 'OUT',
+  _id: 68bfd2fee55d74f09c2e39b4,
+  Name: 'sahil.k@noveloffice.in',
+  'Employee ID': '1771',
+  date: '2025-09-11',
+  time: '05:37:25'
+}
+Inserted document ID: 68c26015b496d79939011cd6
+{ ID: '01', RFID: '1', 'IN/OUT': 'OUT' }
+{
+  ID: '01',
+  RFID: '1',
+  'IN/OUT': 'OUT',
+  _id: 68bfd2fee55d74f09c2e39b4,
+  Name: 'sahil.k@noveloffice.in',
+  'Employee ID': '1771',
+  date: '2025-09-11',
+  time: '05:37:50'
+}
+Inserted document ID: 68c2602eb496d79939011cd7
+{ ID: '01', RFID: '1', 'IN/OUT': 'OUT' }
+{
+  ID: '01',
+  RFID: '1',
+  'IN/OUT': 'OUT',
+  _id: 68bfd2fee55d74f09c2e39b4,
+  Name: 'sahil.k@noveloffice.in',
+  'Employee ID': '1771',
+  date: '2025-09-11',
+  time: '05:37:57'
+}
+Inserted document ID: 68c26035b496d79939011cd8
+{ ID: '01', RFID: '1', 'IN/OUT': 'OUT' }
+{
+  ID: '01',
+  RFID: '1',
+  'IN/OUT': 'OUT',
+  _id: 68bfd2fee55d74f09c2e39b4,
+  Name: 'sahil.k@noveloffice.in',
+  'Employee ID': '1771',
+  date: '2025-09-11',
+  time: '05:37:59'
+}
+Inserted document ID: 68c26037b496d79939011cd9
+{ ID: '01', RFID: '1', 'IN/OUT': 'OUT' }
+{
+  ID: '01',
+  RFID: '1',
+  'IN/OUT': 'OUT',
+  _id: 68bfd2fee55d74f09c2e39b4,
+  Name: 'sahil.k@noveloffice.in',
+  'Employee ID': '1771',
+  date: '2025-09-11',
+  time: '05:38:18'
+}
+Inserted document ID: 68c2604ab496d79939011cda
+{ ID: '01', RFID: '1', 'IN/OUT': 'OUT' }
+{
+  ID: '01',
+  RFID: '1',
+  'IN/OUT': 'OUT',
+  _id: 68bfd2fee55d74f09c2e39b4,
+  Name: 'sahil.k@noveloffice.in',
+  'Employee ID': '1771',
+  date: '2025-09-11',
+  time: '05:38:20'
+}
+Inserted document ID: 68c2604cb496d79939011cdb
+{ ID: '01', RFID: '10', 'IN/OUT': 'OUT' }
+{ RFID: '1' }
+{
+  RFID: '1',
+  _id: 68bfd2fee55d74f09c2e39b4,
+  Name: 'sahil.k@noveloffice.in',
+  'Employee ID': '1771',
+  date: '2025-09-11',
+  time: '05:41:18'
+}
+Inserted document ID: 68c260feb496d79939011cdc
+{ ID: '01', RFID: '1', 'IN/OUT': 'OUT' }
+{
+  ID: '01',
+  RFID: '1',
+  'IN/OUT': 'OUT',
+  _id: 68bfd2fee55d74f09c2e39b4,
+  Name: 'sahil.k@noveloffice.in',
+  'Employee ID': '1771',
+  date: '2025-09-11',
+  time: '05:42:43'
+}
+Inserted document ID: 68c26153b496d79939011cdd

@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Employee Form</title>
+  <style>
+    * { box-sizing: border-box; }
+    body, h2, p {
+      margin: 0;
+      padding: 0;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      background: linear-gradient(135deg, #74ebd5 0%, #ACB6E5 100%);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 18px;
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    h2 {
+      color: #1f2937;
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+      text-align: center;
+    }
+
+    form {
+      background: #fff;
+      padding: 28px 34px;
+      border-radius: 14px;
+      box-shadow: 0 12px 30px rgba(18, 38, 63, 0.12);
+      width: 100%;
+      max-width: 420px;
+      text-align: left;
+      animation: fadeIn 0.6s ease-in-out;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #374151;
+      font-size: 13px;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid #e6e6e9;
+      border-radius: 8px;
+      outline: none;
+      margin-bottom: 18px;
+      transition: border 0.18s, box-shadow 0.18s;
+      font-size: 14px;
+      background: #fafafa;
+    }
+
+    input[type="text"]:focus {
+      border-color: #7c5cff;
+      box-shadow: 0 6px 18px rgba(124, 92, 255, 0.12);
+      background: #fff;
+    }
+
+    .form-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      justify-content: flex-start;
+      margin-top: 6px;
+    }
+
+    button {
+      background: linear-gradient(180deg,#7c5cff,#5f44e6);
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 14px;
+      box-shadow: 0 8px 18px rgba(92, 67, 230, 0.18);
+      transition: transform 0.12s, box-shadow 0.12s;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 28px rgba(92, 67, 230, 0.22);
+    }
+
+    a {
+      display: inline-flex;
+      align-items: center;
+      padding: 8px 12px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 13px;
+      color: #5f44e6;
+      background: rgba(95,68,230,0.06);
+      border: 1px solid rgba(95,68,230,0.08);
+      transition: background 0.12s, color 0.12s, transform 0.12s;
+    }
+
+    a:hover {
+      background: rgba(95,68,230,0.12);
+      color: #3d25b8;
+      transform: translateY(-1px);
+    }
+
+    #response {
+      margin-top: 10px;
+      font-weight: 600;
+      color: #0f172a;
+      text-align: center;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 420px) {
+      form { padding: 20px; border-radius: 12px; }
+      .form-actions { flex-direction: column; align-items: stretch; }
+      a { justify-content: center; width: 100%; }
+    }
+  </style>
+</head>
+
+<body>
+  <h2>Employee Form</h2>
+  <form id="myForm">
+    <label>Name:</label>
+    <input type="text" id="Name" name="Name" required>
+
+    <label>RFID:</label>
+    <input type="text" id="RFID" name="RFID" required>
+
+    <div class="form-actions">
+      <button type="button" onclick="window.location.href='select_cabin.html'">Select Cabin Access</button>
+    </div>
+
+    <div id="selected-cabin">No cabin selected</div>
+
+    <div class="form-actions">
+      <button type="button" onclick="window.location.href='select_log_cabin.html'">Select Log Cabin</button>
+    </div>
+
+    <div id="selected-log-cabin">No log cabin selected</div>
+
+    <div class="form-actions">
+      <button type="submit">Submit</button>
+      <a href="./list.html">View All Data</a>
+      <a href="./create_doors.html">Create Doors</a>
+    </div>
+  </form>
+
+  <p id="response"></p>
+
+  <script>
+    // Retrieve selected cabins and log cabin from localStorage
+    const selectedCabins = JSON.parse(localStorage.getItem("selectedCabins")) || [];
+    const selectedLogCabin = localStorage.getItem("selectedLogCabin") || null;
+  
+    // Restore Name and RFID values from localStorage (if previously saved)
+    const savedName = localStorage.getItem("formName") || "";
+    const savedRFID = localStorage.getItem("formRFID") || "";
+  
+    document.getElementById("Name").value = savedName;
+    document.getElementById("RFID").value = savedRFID;
+  
+    // Update cabin display
+    document.getElementById("selected-cabin").textContent =
+      selectedCabins.length > 0
+        ? "Selected Cabin IDs: " + selectedCabins.join(", ")
+        : "No cabin selected";
+  
+    document.getElementById("selected-log-cabin").textContent =
+      selectedLogCabin
+        ? "Selected Log Cabin: " + selectedLogCabin
+        : "No log cabin selected";
+  
+    // ✅ Save current form input before navigating away
+    function saveFormInputs() {
+      const name = document.getElementById("Name").value.trim();
+      const rfid = document.getElementById("RFID").value.trim();
+      localStorage.setItem("formName", name);
+      localStorage.setItem("formRFID", rfid);
+    }
+  
+    // Add save before navigating
+    document.querySelector('button[onclick*="select_cabin.html"]').addEventListener("click", saveFormInputs);
+    document.querySelector('button[onclick*="select_log_cabin.html"]').addEventListener("click", saveFormInputs);
+  
+    // ✅ Handle form submission
+    document.getElementById("myForm").addEventListener("submit", async function(e) {
+      e.preventDefault();
+  
+      const name = document.getElementById("Name").value.trim();
+      const rfid = document.getElementById("RFID").value.trim();
+  
+      const data = {
+        Name: name,
+        RFID: rfid,
+        Cabins: selectedCabins,
+        Log_Cabin: selectedLogCabin
+      };
+  
+      try {
+        const res = await fetch("https://accesshub.novelinfra.com/submit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data)
+        });
+  
+        const result = await res.json();
+        document.getElementById("response").innerText =
+          result.message || "✅ Data submitted successfully!";
+  
+        // ✅ Clear form and localStorage data after successful submission
+        document.getElementById("Name").value = "";
+        document.getElementById("RFID").value = "";
+        document.getElementById("selected-cabin").textContent = "No cabin selected";
+        document.getElementById("selected-log-cabin").textContent = "No log cabin selected";
+        document.getElementById("response").style.color = "green";
+  
+        // Remove stored data
+        localStorage.removeItem("formName");
+        localStorage.removeItem("formRFID");
+        localStorage.removeItem("selectedCabins");
+        localStorage.removeItem("selectedLogCabin");
+  
+      } catch (err) {
+        console.error(err);
+        document.getElementById("response").innerText = "❌ Error submitting form!";
+        document.getElementById("response").style.color = "red";
+      }
+    });
+  </script>
+</body>
+</html>
