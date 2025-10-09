@@ -1,0 +1,473 @@
+#include "WiegandMultiReader.h"
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
+#include <WiFi.h>
+#include <WebServer.h>
+#include <WiFiClientSecure.h>
+#include <Preferences.h>
+#include <DNSServer.h>
+
+
+const char* serverUrl = "https://accesshub.novelinfra.com/api/submit";
+
+
+const char* ap_ssid = "ESP32_Odor";
+const char* ap_password = "12345678";
+const int AP_CHANNEL = 1;
+const int AP_MAX_CONNECTION = 4;
+
+
+bool connectedToWiFi = false;
+bool ledNotified = false;
+unsigned long wifiConnectTime = 0;
+
+
+Preferences preferences;
+WebServer server(80);
+DNSServer dnsServer;
+WiFiClientSecure ssl;
+
+// Reader objects
+WIEGAND readerIn, readerOut;
+
+
+String deviceID = "0";
+String customAPSSID = "ESP32_Odor";  // default
+
+// Pins
+const int D0_IN = 16, D1_IN = 17;   // IN reader
+const int D0_OUT = 21, D1_OUT = 22; // OUT reader
+
+
+const int Red_PIN1 = 0;
+const int Red_PIN2 = 4;
+
+const int Green_PIN1 = 2;
+const int Green_PIN2 = 5;
+
+#define RELAY_PIN 18   // change to your GPIO pin
+
+TaskHandle_t relayTaskHandle = NULL;
+int relayDuration = 0;   // store latest duration
+unsigned long relayStart = 0;
+
+
+
+
+
+unsigned long lastResetCheck = 0;
+const unsigned long oneWeekMillis = 7UL * 24UL * 60UL * 60UL * 1000UL; // 604,800,000 ms
+
+
+
+
+const char* CONFIG_HTML = R"rawliteral(
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WiFi Setup</title>
+<style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:sans-serif; background:#000; color:#fff; min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
+    .container { background:#fff; color:#000; border-radius:8px; padding:30px; width:100%; max-width:320px; text-align:center; }
+    h1 { margin-bottom:15px; font-size:18px; font-weight:600; }
+    p#currentNetwork { margin-bottom:20px; font-size:13px; color:#333; }
+    .form-group { margin-bottom:20px; text-align:left; }
+    label { display:block; margin-bottom:6px; font-weight:500; font-size:13px; }
+    input { width:100%; padding:12px; border:1px solid #ddd; border-radius:6px; font-size:14px; }
+    input:focus { outline:none; border-color:#000; }
+    .btn { width:100%; padding:12px; background:#000; color:#fff; border:none; border-radius:6px; font-size:14px; font-weight:600; cursor:pointer; }
+    .btn:hover { background:#333; }
+    .status { margin-top:15px; padding:10px; border-radius:6px; font-size:12px; display:none; }
+    .status.success { background:#e8f5e8; color:#2d5a2d; border:1px solid #c3e6c3; }
+    .status.error { background:#ffe8e8; color:#5a2d2d; border:1px solid #e6c3c3; }
+</style>
+</head>
+<body>
+<div class="container">
+    <h1>WiFi Setup</h1>
+    <p id="currentNetwork">Checking current WiFi...</p>
+    <form id="wifiForm">
+        <div class="form-group">
+            <label for="ssid">WiFi Name</label>
+            <input type="text" id="ssid" name="ssid" placeholder="Enter WiFi name" required>
+        </div>
+        <div class="form-group">
+            <label for="password">WiFi Password</label>
+            <input type="password" id="password" name="password" placeholder="Enter WiFi password" required>
+        </div>
+        <div class="form-group">
+            <label for="id">Device ID</label>
+            <input type="number" id="id" name="id" placeholder="Enter Device ID" required>
+        </div>
+        <div class="form-group">
+            <label for="apssid">Access Point Name (AP SSID)</label>
+            <input type="text" id="apssid" name="apssid" placeholder="ESP32_AP" required>
+        </div>
+        <button type="submit" class="btn">Save & Connect</button>
+    </form>
+    <div class="status" id="status"></div>
+</div>
+<script>
+document.getElementById('wifiForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const ssid = document.getElementById('ssid').value;
+    const password = document.getElementById('password').value;
+    const id = document.getElementById('id').value;
+    const apssid = document.getElementById('apssid').value;
+    if (!ssid || !password || !id || !apssid) {
+        showStatus('Please fill in all fields', 'error');
+        return;
+    }
+    fetch('/configure', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `ssid=${encodeURIComponent(ssid)}&password=${encodeURIComponent(password)}&id=${encodeURIComponent(id)}&apssid=${encodeURIComponent(apssid)}`
+    })
+    .then(response => response.text())
+    .then(data => {
+        if (data.includes('success')) {
+            showStatus('Configuration saved successfully!', 'success');
+        } else {
+            showStatus('Failed to configure WiFi', 'error');
+        }
+    })
+    .catch(() => { showStatus('Connection error', 'error'); });
+});
+function showStatus(message, type) {
+    const status = document.getElementById('status');
+    status.textContent = message;
+    status.className = `status ${type}`;
+    status.style.display = 'block';
+}
+function fetchStatus() {
+    fetch('/status')
+        .then(response => response.text())
+        .then(data => {
+            document.getElementById('currentNetwork').textContent =
+                "Currently connected to: " + data;
+        })
+        .catch(() => {
+            document.getElementById('currentNetwork').textContent =
+                "Currently connected to: Not Connected";
+        });
+}
+fetchStatus();
+setInterval(fetchStatus, 10000);
+</script>
+</body>
+</html>
+)rawliteral";
+
+
+
+
+
+void startAP() {
+  IPAddress local_IP(10,10,10,1);
+  IPAddress gateway(10,10,10,1);
+  IPAddress subnet(255,255,255,0);
+  WiFi.softAPConfig(local_IP, gateway, subnet);
+  WiFi.softAP(customAPSSID.c_str(), ap_password, AP_CHANNEL, false, AP_MAX_CONNECTION);
+}
+
+
+
+
+void setupWiFi() {
+  preferences.begin("wifi", false);
+  String saved_ssid = preferences.getString("ssid", "");
+  String saved_pass = preferences.getString("pass", "");
+  deviceID = String(preferences.getInt("id", 0));
+  customAPSSID = preferences.getString("apssid", "ESP32_Odor");
+
+  WiFi.mode(WIFI_AP_STA); // always AP+STA
+  startAP();
+
+  if (saved_ssid != "") {
+    WiFi.begin(saved_ssid.c_str(), saved_pass.c_str());
+    for (int i = 0; i < 20; i++) {
+      if (WiFi.status() == WL_CONNECTED) break;
+      delay(500);
+    }
+    connectedToWiFi = (WiFi.status() == WL_CONNECTED);
+    if (connectedToWiFi) {
+      wifiConnectTime = millis();
+      ledNotified = false;
+    }
+  }
+}
+
+void handleRoot() { server.send(200, "text/html", CONFIG_HTML); }
+
+
+void handleConfigure() {
+  if (server.hasArg("ssid") && server.hasArg("password") && server.hasArg("id") && server.hasArg("apssid")) {
+    String ssid = server.arg("ssid");
+    String password = server.arg("password");
+    int id = server.arg("id").toInt();
+    String apssid = server.arg("apssid");
+    if (ssid == "" || password == "" || apssid == "") {
+      server.send(400, "text/plain", "Missing fields"); return;
+    }
+
+    preferences.putString("ssid", ssid);
+    preferences.putString("pass", password);
+    preferences.putInt("id", id);
+    preferences.putString("apssid", apssid);
+    deviceID = id;
+    customAPSSID = apssid;
+
+    // Restart AP with new SSID
+    WiFi.softAPdisconnect(true);
+    delay(200);
+    startAP();
+
+    // Try connecting STA
+    WiFi.begin(ssid.c_str(), password.c_str());
+    bool connected = false;
+    for (int i = 0; i < 15; i++) {
+      if (WiFi.status() == WL_CONNECTED) { connected = true; break; }
+      delay(500);
+    }
+
+    if (connected) {
+      connectedToWiFi = true;
+      wifiConnectTime = millis();
+      ledNotified = false;
+
+      server.send(200, "text/plain", "success");
+    } else {
+      connectedToWiFi = false;
+      server.send(400, "text/plain", "Failed to connect");
+    }
+  } else {
+    server.send(400, "text/plain", "Missing credentials");
+  }
+}
+
+
+void handleStatus() {
+  if (WiFi.status() == WL_CONNECTED) {
+    server.send(200, "text/plain", WiFi.SSID());
+  } else {
+    server.send(200, "text/plain", "Not Connected");
+  }
+}
+
+void handleNotFound() { server.sendHeader("Location", "/", true); server.send(302, "text/plain", ""); }
+
+
+
+
+
+
+
+
+
+
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(Red_PIN1, OUTPUT);
+  pinMode(Green_PIN1, OUTPUT);
+  pinMode(Red_PIN2, OUTPUT);
+  pinMode(Green_PIN2, OUTPUT);
+  pinMode(RELAY_PIN, OUTPUT);
+  digitalWrite(Red_PIN2, HIGH);
+  digitalWrite(Green_PIN2, HIGH);
+  digitalWrite(Red_PIN1, HIGH);
+  digitalWrite(Green_PIN1, HIGH);
+  digitalWrite(RELAY_PIN, HIGH); // relay off
+
+
+
+
+  // Setup pins for IN reader
+  pinMode(D0_IN, INPUT_PULLUP);
+  pinMode(D1_IN, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(D0_IN), []() { readerIn.ReadD0(); }, FALLING);
+  attachInterrupt(digitalPinToInterrupt(D1_IN), []() { readerIn.ReadD1(); }, FALLING);
+
+  // Setup pins for OUT reader
+  pinMode(D0_OUT, INPUT_PULLUP);
+  pinMode(D1_OUT, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(D0_OUT), []() { readerOut.ReadD0(); }, FALLING);
+  attachInterrupt(digitalPinToInterrupt(D1_OUT), []() { readerOut.ReadD1(); }, FALLING);
+  
+
+  ssl.setInsecure();
+  setupWiFi();
+  dnsServer.start(53, "*", WiFi.softAPIP());
+  server.on("/", HTTP_GET, handleRoot);
+  server.on("/configure", HTTP_POST, handleConfigure);
+  server.on("/status", HTTP_GET, handleStatus);
+  server.onNotFound(handleNotFound);
+  server.begin();
+
+  Serial.println("Wiegand Readers Ready...");
+
+  Serial.println("Wiegand Readers Ready...");
+  if (WiFi.status() == WL_CONNECTED) {
+        digitalWrite(Red_PIN1, HIGH);
+        digitalWrite(Red_PIN2, HIGH);
+    } else {
+        Serial.println("\nFailed to connect to WiFi!");
+        digitalWrite(Red_PIN1, LOW);
+        digitalWrite(Red_PIN2, LOW);
+    }
+}
+
+
+
+
+
+String callAPI(const char* id, const char* rfid, const char* direction) {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WiFi not connected!");
+  }
+
+  HTTPClient http;
+  http.begin(serverUrl);
+  http.addHeader("Content-Type", "application/json");
+
+  StaticJsonDocument<200> doc;
+  doc["ID"] = id;
+  doc["RFID"] = rfid;
+  doc["IN/OUT"] = direction;
+
+  String requestBody;
+  serializeJson(doc, requestBody);
+
+  Serial.println("Sending JSON: " + requestBody);
+
+  int httpCode = http.POST(requestBody);
+  String response = http.getString();
+
+  Serial.printf("Response code: %d\n", httpCode);
+  Serial.println("Response: " + response);
+  http.end();
+  return response;
+}
+
+
+
+
+
+
+
+
+// Relay task - keeps checking until time is up
+void relayTask(void* parameter) {
+  for (;;) {
+    if (relayDuration > 0) {
+      digitalWrite(RELAY_PIN, LOW);  // relay ON
+      if (millis() - relayStart >= relayDuration) {
+        digitalWrite(RELAY_PIN, HIGH); // relay OFF
+        relayDuration = 0;            // reset
+      }
+    }
+    vTaskDelay(100 / portTICK_PERIOD_MS); // check every 100ms
+  }
+}
+
+// Function to turn on relay with resettable timer
+void turnOnRelay(int durationMs) {
+  relayDuration = durationMs;     // update latest duration
+  relayStart = millis();          // reset timer start
+  Serial.println("Relay ON, duration reset to " + String(durationMs) + "ms");
+
+  // create task once if not running
+  if (relayTaskHandle == NULL) {
+    xTaskCreate(
+      relayTask,
+      "RelayTask",
+      2000,
+      NULL,
+      1,
+      &relayTaskHandle
+    );
+  }
+}
+
+
+
+
+
+
+void checkWiFiStatus() {
+    if (WiFi.status() == WL_CONNECTED) {
+        digitalWrite(Red_PIN1, HIGH);
+        digitalWrite(Red_PIN2, HIGH);
+    } else {
+        Serial.println("\nFailed to connect to WiFi!");
+        digitalWrite(Red_PIN1, LOW);
+        digitalWrite(Red_PIN2, LOW);
+    }
+}
+
+
+void checkWeeklyReset() {
+  if (millis() - lastResetCheck >= oneWeekMillis) {
+    lastResetCheck = millis(); // Optional: not needed since we're restarting
+    ESP.restart();             // Soft reset the ESP32
+  }
+}
+
+
+
+
+
+
+void loop() {
+  dnsServer.processNextRequest();
+  server.handleClient();
+  checkWiFiStatus();
+  checkWeeklyReset();
+  // Check IN reader
+  if (readerIn.available()) {
+    digitalWrite(Green_PIN1, HIGH);
+    uint32_t code = readerIn.getCode();
+    Serial.print("IN Reader: ");
+    Serial.println(code);
+    String result = callAPI(deviceID.c_str(), String(code).c_str(), "IN");
+    if (result.indexOf("\"status\":\"success\"") >= 0) {
+    turnOnRelay(5000); // relay ON for 5 sec
+    Serial.println("✅ success");
+    digitalWrite(Green_PIN1, LOW);
+    delay(500);
+    digitalWrite(Green_PIN1, HIGH);
+    }
+    else if (result.indexOf("\"status\":\"error\"") >= 0) {
+    Serial.println("❌ error");
+    digitalWrite(Red_PIN1, LOW);
+    delay(700);
+    digitalWrite(Red_PIN1, HIGH);
+    }
+
+  }
+
+  // Check OUT reader
+  if (readerOut.available()) {
+    uint32_t code = readerOut.getCode();
+    Serial.print("OUT Reader: ");
+    Serial.println(code);
+    String result = callAPI(deviceID.c_str(), String(code).c_str(), "OUT");
+    if (result.indexOf("\"status\":\"success\"") >= 0) {
+    turnOnRelay(5000); // relay ON for 5 sec
+    Serial.println("✅ success");
+    digitalWrite(Green_PIN2, LOW);
+    delay(500);
+    digitalWrite(Green_PIN2, HIGH);
+    } 
+    else if (result.indexOf("\"status\":\"error\"") >= 0) {
+    Serial.println("❌ error");
+    digitalWrite(Red_PIN2, LOW);
+    delay(700);
+    digitalWrite(Red_PIN2, HIGH);
+   }
+  }
+  delay(10);
+}
