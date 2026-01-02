@@ -589,7 +589,15 @@ void handleConfigure() {
       return;
     }
 
+    preferences.begin("wifi", false);   // ✅ REQUIRED
+
+    // 🔥 RESET WIFI STATE (KEY FIX)
+    WiFi.disconnect(true, true);
+    delay(800);
+
     WiFi.mode(WIFI_AP_STA);
+    delay(300);
+
     WiFi.begin(ssid.c_str(), password.c_str());
 
     bool connected = false;
@@ -611,6 +619,9 @@ void handleConfigure() {
       connectedToWiFi = false;
       server.send(400, "text/plain", "Failed to connect");
     }
+
+    preferences.end();   // ✅ REQUIRED
+
   } else {
     server.send(400, "text/plain", "Missing credentials");
   }
