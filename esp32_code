@@ -863,7 +863,7 @@ void loop() {
     }
   }
 yield(); // prevent WDT lock
-delay(10);
+delay(50);
 }
 
 
